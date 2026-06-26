@@ -33,10 +33,12 @@ services:
     container_name: rag-frontend
     ports:
       - "80:80"
+      - "443:443"
     restart: unless-stopped
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
       - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/certs:/etc/nginx/certs:ro
     depends_on:
       backend:
         condition: service_healthy
