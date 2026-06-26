@@ -1,0 +1,374 @@
+// ── Config ──────────────────────────────────────────────────────────────────
+// const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
+const API_BASE = "/api";
+
+
+// ── State ───────────────────────────────────────────────────────────────────
+let messages = [];   // [{role, content, sources?, metadata?}]
+let loading = false;
+
+// ── DOM refs ────────────────────────────────────────────────────────────────
+const chatArea       = document.getElementById("chatArea");
+const emptyState      = document.getElementById("emptyState");
+const messagesEl      = document.getElementById("messages");
+const inputField      = document.getElementById("inputField");
+const sendBtn         = document.getElementById("sendBtn");
+const clearBtn        = document.getElementById("clearBtn");
+const suggestionChips = document.getElementById("suggestionChips");
+
+// ── Label maps (mirrors main.py) ───────────────────────────────────────────
+const ROLE_LABELS = {
+  parent:        "👨‍👩‍👧 Parent",
+  professionnel: "🏥 Professionnel",
+  ambigu:        "❓ Indéterminé",
+};
+const PHASE_LABELS = {
+  grossesse:       "🤰 Grossesse",
+  "post-natalite": "🍼 Post-natalité",
+  bebe:            "👶 Bébé",
+  enfance:         "🧒 Enfance",
+  adolescence:     "🧑 Adolescence",
+  ambigu:          "❓ Indéterminé",
+};
+
+// ── Minimal markdown renderer (bold, italics, code, lists, line breaks) ────
+function renderMarkdown(text) {
+  let html = escapeHtml(text);
+
+  // code blocks ```...```
+  html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code}</code></pre>`);
+  // inline code
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  // bold
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  // italics
+  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+
+  // lists: turn consecutive "- " or "• " lines into <ul><li>
+  const lines = html.split("\n");
+  let out = [];
+  let inList = false;
+  for (const line of lines) {
+    const m = line.match(/^\s*[-•]\s+(.*)/);
+    if (m) {
+      if (!inList) { out.push("<ul>"); inList = true; }
+      out.push(`<li>${m[1]}</li>`);
+    } else {
+      if (inList) { out.push("</ul>"); inList = false; }
+      if (line.trim() !== "") out.push(`<p>${line}</p>`);
+    }
+  }
+  if (inList) out.push("</ul>");
+  return out.join("\n");
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ── Rendering ───────────────────────────────────────────────────────────────
+function updateInputState() {
+  inputField.disabled = loading;
+  sendBtn.disabled = loading || inputField.value.trim() === "";
+}
+
+function renderMessages() {
+  updateInputState();
+  if (messages.length === 0) {
+    emptyState.style.display = "flex";
+    messagesEl.style.display = "none";
+    clearBtn.style.display = "none";
+    return;
+  }
+
+  emptyState.style.display = "none";
+  messagesEl.style.display = "flex";
+  clearBtn.style.display = "inline-block";
+
+  messagesEl.innerHTML = "";
+
+  messages.forEach((msg) => {
+    const row = document.createElement("div");
+    row.className = `message-row ${msg.role === "user" ? "user-row" : "assistant-row"}`;
+
+    const bubble = document.createElement("div");
+    bubble.className = `bubble ${msg.role === "user" ? "user-bubble" : "assistant-bubble"}`;
+
+    if (msg.role === "user") {
+      const p = document.createElement("p");
+      p.textContent = msg.content;
+      bubble.appendChild(p);
+    } else {
+      // metadata badges
+      if (msg.metadata) bubble.appendChild(buildMetaBar(msg.metadata));
+      // markdown content
+      const contentDiv = document.createElement("div");
+      contentDiv.innerHTML = renderMarkdown(msg.content);
+      bubble.appendChild(contentDiv);
+      // speak button
+      bubble.appendChild(buildSpeakButton(msg.content, msg.metadata?.language));
+      // sources
+      if (msg.sources && msg.sources.length > 0) {
+        bubble.appendChild(buildSources(msg.sources));
+      }
+    }
+
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+  });
+
+  if (loading) {
+    messagesEl.appendChild(buildTypingIndicator());
+  }
+
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function buildMetaBar(meta) {
+  const bar = document.createElement("div");
+  const isUrgent = meta.urgence === "oui";
+  bar.className = `meta-bar ${isUrgent ? "meta-urgent" : ""}`;
+
+  if (isUrgent) {
+    bar.appendChild(makePill("🚨 Urgence", "urgent"));
+  }
+  if (meta.role_detecte) {
+    bar.appendChild(makePill(ROLE_LABELS[meta.role_detecte] || meta.role_detecte));
+  }
+  if (meta.phase) {
+    bar.appendChild(makePill(PHASE_LABELS[meta.phase] || meta.phase));
+  }
+  if (meta.language) {
+    const lang = meta.language.charAt(0).toUpperCase() + meta.language.slice(1);
+    bar.appendChild(makePill(`🌐 ${lang}`));
+  }
+  return bar;
+}
+
+function makePill(text, extraClass = "") {
+  const span = document.createElement("span");
+  span.className = `meta-pill ${extraClass}`;
+  span.textContent = text;
+  return span;
+}
+
+function buildSources(urls) {
+  const wrap = document.createElement("div");
+  wrap.className = "sources";
+
+  const toggle = document.createElement("button");
+  toggle.className = "source-toggle";
+  toggle.innerHTML = `<span>📚 Sources (${urls.length})</span><span class="source-chevron">▼</span>`;
+
+  const list = document.createElement("ul");
+  list.className = "source-list";
+  list.style.display = "none";
+  urls.forEach((url) => {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = url;
+    li.appendChild(a);
+    list.appendChild(li);
+  });
+
+  let open = false;
+  toggle.addEventListener("click", () => {
+    open = !open;
+    list.style.display = open ? "flex" : "none";
+    toggle.querySelector(".source-chevron").textContent = open ? "▲" : "▼";
+  });
+
+  wrap.appendChild(toggle);
+  wrap.appendChild(list);
+  return wrap;
+}
+
+
+// ── Text-to-speech (Web Speech API — free, built into the browser) ────────
+let currentUtterance = null;
+let currentSpeakBtn = null;
+ 
+function stripMarkdownForSpeech(text) {
+  // remove markdown symbols so they aren't read aloud literally
+  return text
+    .replace(/```[\s\S]*?```/g, "")   // code blocks
+    .replace(/`([^`]+)`/g, "$1")      // inline code
+    .replace(/\*\*(.+?)\*\*/g, "$1")  // bold
+    .replace(/\*(.+?)\*/g, "$1")      // italics
+    .replace(/^\s*[-•]\s+/gm, "")     // list markers
+    .trim();
+}
+ 
+function langToBCP47(language) {
+  // map our pipeline's detected language to a speech-synthesis locale
+  const map = {
+    francais: "fr-FR", french: "fr-FR",
+    english: "en-US", anglais: "en-US",
+    arabic: "ar-SA", arabe: "ar-SA",
+    spanish: "es-ES", espagnol: "es-ES",
+  };
+  if (!language) return "fr-FR"; // default, since the app is French-first
+  return map[language.toLowerCase()] || "fr-FR";
+}
+ 
+function stopSpeaking() {
+  window.speechSynthesis.cancel();
+  if (currentSpeakBtn) {
+    currentSpeakBtn.classList.remove("speaking");
+    currentSpeakBtn.textContent = "🔊";
+  }
+  currentUtterance = null;
+  currentSpeakBtn = null;
+}
+ 
+function buildSpeakButton(text, language) {
+  const btn = document.createElement("button");
+  btn.className = "speak-btn";
+  btn.textContent = "🔊";
+  btn.title = "Lire à voix haute";
+ 
+  btn.addEventListener("click", () => {
+    const isThisOneSpeaking = currentSpeakBtn === btn;
+ 
+    // always stop whatever is currently playing first
+    stopSpeaking();
+ 
+    if (isThisOneSpeaking) return; // user clicked the active button → just stop
+ 
+    if (!("speechSynthesis" in window)) {
+      alert("La lecture vocale n'est pas prise en charge par ce navigateur.");
+      return;
+    }
+ 
+    const utterance = new SpeechSynthesisUtterance(stripMarkdownForSpeech(text));
+    utterance.lang = langToBCP47(language);
+    utterance.rate = 1;
+ 
+    utterance.onend = () => stopSpeaking();
+    utterance.onerror = () => stopSpeaking();
+ 
+    currentUtterance = utterance;
+    currentSpeakBtn = btn;
+    btn.classList.add("speaking");
+    btn.textContent = "⏹";
+ 
+    window.speechSynthesis.speak(utterance);
+  });
+ 
+  return btn;
+}
+
+
+
+function buildTypingIndicator() {
+  const row = document.createElement("div");
+  row.className = "message-row assistant-row";
+  row.innerHTML = `
+    <div class="bubble assistant-bubble typing">
+      <span></span><span></span><span></span>
+    </div>`;
+  return row;
+}
+
+function showError(message) {
+  const banner = document.createElement("div");
+  banner.className = "error-banner";
+  banner.innerHTML = `<strong>Erreur :</strong> ${escapeHtml(message)}`;
+  messagesEl.appendChild(banner);
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+// ── Networking ──────────────────────────────────────────────────────────────
+async function sendMessage(text) {
+  messages.push({ role: "user", content: text });
+  loading = true;
+  renderMessages();
+
+  try {
+    const res = await fetch(`${API_BASE}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: text,
+        history: messages
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .slice(0, -1) // exclude the message we just pushed
+          .map((m) => ({ role: m.role, content: m.content })),
+      }),
+    });
+
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const err = await res.json();
+        if (err.detail) detail = err.detail;
+      } catch (_) {}
+      throw new Error(detail);
+    }
+
+    const data = await res.json();
+    loading = false;
+    messages.push({
+      role: "assistant",
+      content: data.answer,
+      sources: data.sources || [],
+      metadata: data.metadata || null,
+    });
+    renderMessages();
+  } catch (e) {
+    loading = false;
+    renderMessages();
+    showError(e.message);
+  }
+}
+
+// ── Event wiring ────────────────────────────────────────────────────────────
+function handleSend() {
+  const text = inputField.value.trim();
+  if (!text || loading) return;
+  inputField.value = "";
+  autoResize();
+  sendMessage(text);
+}
+
+function autoResize() {
+  inputField.style.height = "auto";
+  inputField.style.height = Math.min(inputField.scrollHeight, 160) + "px";
+}
+
+sendBtn.addEventListener("click", handleSend);
+
+inputField.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+});
+
+inputField.addEventListener("input", () => {
+  autoResize();
+  updateInputState();
+});
+
+clearBtn.addEventListener("click", () => {
+  messages = [];
+  renderMessages();
+  stopSpeaking();
+});
+
+suggestionChips.addEventListener("click", (e) => {
+  if (e.target.classList.contains("chip")) {
+    inputField.value = e.target.textContent;
+    inputField.focus();
+    autoResize();
+  }
+});
+
+// initial render
+updateInputState();
+renderMessages();
