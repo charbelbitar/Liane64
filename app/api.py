@@ -10,7 +10,6 @@ import traceback
 from main import rag_pipeline
 from cache import purge_invalid_entries
 
-# Purge stale cache on startup
 purge_invalid_entries()
 
 app = FastAPI(title="RAG Chat API", version="1.0.0")
@@ -18,7 +17,7 @@ app = FastAPI(title="RAG Chat API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000", "http://127.0.0.1:3000",  # plain HTML/CSS/JS frontend
+        "http://localhost:3000", "http://127.0.0.1:3000",
     ],    
     allow_credentials=True,
     allow_methods=["*"],
@@ -26,10 +25,8 @@ app.add_middleware(
 )
 
 
-# ── Schemas ───────────────────────────────────────────────────────────────────
-
 class Message(BaseModel):
-    role: str       # "user" | "assistant"
+    role: str     
     content: str
 
 class ChatRequest(BaseModel):
@@ -49,8 +46,6 @@ class ChatResponse(BaseModel):
     metadata: Optional[Metadata] = None
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -65,7 +60,6 @@ def chat(req: ChatRequest):
         answer, parsed = rag_pipeline(req.message, history)
 
         sources = parsed.get("sources", []) if parsed else []
-        # sources is already a list of URL strings
 
         metadata = None
         if parsed:

@@ -344,6 +344,22 @@ def _do_rewrite(query: str, history_text: str, last_assistant: str = "") -> str:
     return _llm([{"role": "user", "content": prompt}])
 
 
+def _extract_reponse_field(raw: str) -> str | None:
+    """Best-effort extraction of the 'reponse' value when the JSON is
+    truncated or otherwise unparseable, so the user sees clean text
+    instead of a raw JSON dump."""
+    match = re.search(r'"reponse"\s*:\s*"(.*)', raw, re.DOTALL)
+    if not match:
+        return None
+    content = match.group(1)
+    end = re.search(r'"\s*,\s*"sources"', content)
+    if end:
+        content = content[:end.start()]
+    content = content.replace('\\n', '\n').replace('\\"', '"').replace('\\t', '\t')
+    content = re.sub(r'```\s*$', '', content).strip()
+    return content or None
+
+
 def parse_llm_response(raw: str) -> dict:
     cleaned = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
     cleaned = re.sub(r"\s*```$", "", cleaned).strip()
@@ -371,6 +387,15 @@ def parse_llm_response(raw: str) -> dict:
                 return parsed
             except json.JSONDecodeError:
                 pass
+
+        extracted = _extract_reponse_field(cleaned)
+        if extracted:
+            return {
+                "language": "ambigu", "niveau_langue": "ambigu",
+                "role_detecte": "ambigu", "phase": "ambigu",
+                "urgence": "non", "reponse": extracted, "sources": [],
+            }
+    
         return {
             "language": "ambigu", 
             "niveau_langue": "ambigu",
@@ -453,15 +478,48 @@ def print_response(parsed: dict):
     print()
 
 
-def is_grounded(answer: str, context_docs: list[str], extra_allowance_words: int = 0) -> bool:
-    # extra_allowance_words accounts for content that's legitimately allowed in the answer but doesn't come from context_docs (e.g. events/services blocks, which
-    # are reproduced verbatim from their own collections, not the main KB)
-    total_context_words = sum(len(d.split()) for d in context_docs) + extra_allowance_words
-    answer_words = len(answer.split())
-    if answer_words > total_context_words * 0.8:
-        print(f"[GROUNDING] Suspicious: answer={answer_words} words, context={total_context_words} words")
-        return False
-    return True
+_BOILERPLATE_PATTERNS = [
+    r"🚨.*?119.*?danger",
+    r"Le Fil des parents.*?Tipi",
+    r"monenfant\.fr",
+    r"SAMU.*?15.*?Police.*?17.*?[Pp]ompiers.*?18",
+]
+
+def _strip_boilerplate(text: str) -> str:
+    for pat in _BOILERPLATE_PATTERNS:
+        text = re.sub(pat, "", text, flags=re.IGNORECASE | re.DOTALL)
+    return text
+
+
+def _compute_overlap(answer: str, context_docs: list[str]) -> float:
+    """Fraction of the answer's substantive words that actually appear
+    somewhere in the retrieved context. Used as a cheap grounding signal."""
+    context_text = " ".join(context_docs).lower()
+    context_words = set(re.findall(r"\w{4,}", context_text))
+    answer_words_list = re.findall(r"\w{4,}", _strip_boilerplate(answer).lower())
+    if not answer_words_list:
+        return 1.0
+    matched = sum(1 for w in answer_words_list if w in context_words)
+    return matched / len(answer_words_list)
+
+
+def llm_grounding_check(answer: str, context_docs: list[str]) -> bool:
+    """Second-opinion check, used only when the cheap heuristic is ambiguous.
+    Returns True if grounded, False if the answer contains unsupported claims."""
+    context_text = "\n\n".join(context_docs)[:6000]
+    prompt = (
+        "Voici un CONTEXTE et une RÉPONSE générée à partir de ce contexte.\n"
+        "Réponds UNIQUEMENT par OUI si chaque affirmation factuelle de la réponse "
+        "est présente dans le contexte ou en découle directement. "
+        "Réponds NON si la réponse contient une information absente du contexte.\n\n"
+        f"CONTEXTE:\n{context_text}\n\nRÉPONSE:\n{answer}\n\nVerdict (OUI/NON):"
+    )
+    try:
+        verdict = _llm([{"role": "user", "content": prompt}], temperature=0, max_tokens=5)
+        return verdict.strip().upper().startswith("OUI")
+    except RuntimeError as e:
+        print(f"[GROUNDING-LLM] Check failed, defaulting to trust heuristic: {e}")
+        return True
 
 
 # main logic 
@@ -754,7 +812,18 @@ def rag_pipeline(query: str, chat_history):
     extra_words = sum(len(e.get("text", "").split()) for e in (relevant_events or []))
     extra_words += sum(len(s.get("text", "").split()) for s in (relevant_services or []))
  
-    if not is_grounded(answer, context_parts, extra_allowance_words=extra_words):
+    overlap = _compute_overlap(answer, context_parts)
+    print(f"[GROUNDING] Lexical overlap score: {overlap:.2f}")
+
+    if overlap < 0.15:
+        grounded = False
+    elif overlap > 0.40:
+        grounded = True
+    else:
+        print("[GROUNDING] Borderline heuristic score — escalating to LLM check")
+        grounded = llm_grounding_check(answer, context_parts)
+
+    if not grounded:
         print("[GROUNDING] Answer may contain hallucinated content — discarding")
         out = "Pas de ressources disponibles."
         _append_turn(chat_history, query, out)

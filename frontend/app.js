@@ -1,13 +1,8 @@
-// ── Config ──────────────────────────────────────────────────────────────────
-// const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`;
 const API_BASE = "/api";
 
-
-// ── State ───────────────────────────────────────────────────────────────────
-let messages = [];   // [{role, content, sources?, metadata?}]
+let messages = [];  
 let loading = false;
 
-// ── DOM refs ────────────────────────────────────────────────────────────────
 const chatArea       = document.getElementById("chatArea");
 const emptyState      = document.getElementById("emptyState");
 const messagesEl      = document.getElementById("messages");
@@ -16,7 +11,6 @@ const sendBtn         = document.getElementById("sendBtn");
 const clearBtn        = document.getElementById("clearBtn");
 const suggestionChips = document.getElementById("suggestionChips");
 
-// ── Label maps (mirrors main.py) ───────────────────────────────────────────
 const ROLE_LABELS = {
   parent:        "👨‍👩‍👧 Parent",
   professionnel: "🏥 Professionnel",
@@ -31,20 +25,14 @@ const PHASE_LABELS = {
   ambigu:          "❓ Indéterminé",
 };
 
-// ── Minimal markdown renderer (bold, italics, code, lists, line breaks) ────
 function renderMarkdown(text) {
   let html = escapeHtml(text);
 
-  // code blocks ```...```
   html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code}</code></pre>`);
-  // inline code
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
-  // bold
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  // italics
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
 
-  // lists: turn consecutive "- " or "• " lines into <ul><li>
   const lines = html.split("\n");
   let out = [];
   let inList = false;
@@ -68,7 +56,6 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ── Rendering ───────────────────────────────────────────────────────────────
 function updateInputState() {
   inputField.disabled = loading;
   sendBtn.disabled = loading || inputField.value.trim() === "";
@@ -189,30 +176,27 @@ function buildSources(urls) {
 }
 
 
-// ── Text-to-speech (Web Speech API — free, built into the browser) ────────
 let currentUtterance = null;
 let currentSpeakBtn = null;
  
 function stripMarkdownForSpeech(text) {
-  // remove markdown symbols so they aren't read aloud literally
   return text
-    .replace(/```[\s\S]*?```/g, "")   // code blocks
-    .replace(/`([^`]+)`/g, "$1")      // inline code
-    .replace(/\*\*(.+?)\*\*/g, "$1")  // bold
-    .replace(/\*(.+?)\*/g, "$1")      // italics
-    .replace(/^\s*[-•]\s+/gm, "")     // list markers
+    .replace(/```[\s\S]*?```/g, "")   
+    .replace(/`([^`]+)`/g, "$1")      
+    .replace(/\*\*(.+?)\*\*/g, "$1")  
+    .replace(/\*(.+?)\*/g, "$1")      
+    .replace(/^\s*[-•]\s+/gm, "")   
     .trim();
 }
  
 function langToBCP47(language) {
-  // map our pipeline's detected language to a speech-synthesis locale
   const map = {
     francais: "fr-FR", french: "fr-FR",
     english: "en-US", anglais: "en-US",
     arabic: "ar-SA", arabe: "ar-SA",
     spanish: "es-ES", espagnol: "es-ES",
   };
-  if (!language) return "fr-FR"; // default, since the app is French-first
+  if (!language) return "fr-FR"; 
   return map[language.toLowerCase()] || "fr-FR";
 }
  
@@ -235,10 +219,9 @@ function buildSpeakButton(text, language) {
   btn.addEventListener("click", () => {
     const isThisOneSpeaking = currentSpeakBtn === btn;
  
-    // always stop whatever is currently playing first
     stopSpeaking();
  
-    if (isThisOneSpeaking) return; // user clicked the active button → just stop
+    if (isThisOneSpeaking) return; 
  
     if (!("speechSynthesis" in window)) {
       alert("La lecture vocale n'est pas prise en charge par ce navigateur.");
@@ -263,8 +246,6 @@ function buildSpeakButton(text, language) {
   return btn;
 }
 
-
-
 function buildTypingIndicator() {
   const row = document.createElement("div");
   row.className = "message-row assistant-row";
@@ -283,7 +264,6 @@ function showError(message) {
   chatArea.scrollTop = chatArea.scrollHeight;
 }
 
-// ── Networking ──────────────────────────────────────────────────────────────
 async function sendMessage(text) {
   messages.push({ role: "user", content: text });
   loading = true;
@@ -297,7 +277,7 @@ async function sendMessage(text) {
         message: text,
         history: messages
           .filter((m) => m.role === "user" || m.role === "assistant")
-          .slice(0, -1) // exclude the message we just pushed
+          .slice(0, -1)
           .map((m) => ({ role: m.role, content: m.content })),
       }),
     });
@@ -327,7 +307,6 @@ async function sendMessage(text) {
   }
 }
 
-// ── Event wiring ────────────────────────────────────────────────────────────
 function handleSend() {
   const text = inputField.value.trim();
   if (!text || loading) return;
@@ -369,6 +348,5 @@ suggestionChips.addEventListener("click", (e) => {
   }
 });
 
-// initial render
 updateInputState();
 renderMessages();
