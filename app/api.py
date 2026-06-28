@@ -10,6 +10,8 @@ import traceback
 from main import rag_pipeline
 from cache import purge_invalid_entries
 
+from prometheus_fastapi_instrumentator import Instrumentator
+
 purge_invalid_entries()
 
 app = FastAPI(title="RAG Chat API", version="1.0.0")
@@ -23,6 +25,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 
 class Message(BaseModel):

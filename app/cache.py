@@ -5,6 +5,7 @@ import uuid
 import json
 import pathlib
 from embeddings import embed
+from metrics import CACHE_HITS, CACHE_MISSES
 
 # Create or get cache collection
 cache_collection = chroma_client.get_or_create_collection(
@@ -168,10 +169,12 @@ def get_cached_answer(query: str) -> str | None:
 
     if similarity < SIMILARITY_THRESHOLD:
         print("[CACHE MISS]")
+        CACHE_MISSES.inc()
         return None
        
  
     print("[CACHE HIT]")
+    CACHE_HITS.inc()
     return results["documents"][0][0]
 
 

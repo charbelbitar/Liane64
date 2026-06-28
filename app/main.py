@@ -13,6 +13,9 @@ import concurrent.futures
 import time        
 import threading
 from langdetect import detect_langs
+from prometheus_client import Counter
+from metrics import GROUNDING_DISCARDED, GROUNDING_LLM_CHECK_CALLS
+
 
 _tokenizer = MistralTokenizer.v3()
 _tok = _tokenizer.instruct_tokenizer.tokenizer
@@ -821,9 +824,11 @@ def rag_pipeline(query: str, chat_history):
         grounded = True
     else:
         print("[GROUNDING] Borderline heuristic score — escalating to LLM check")
+        GROUNDING_LLM_CHECK_CALLS.inc()
         grounded = llm_grounding_check(answer, context_parts)
 
     if not grounded:
+        GROUNDING_DISCARDED.inc()
         print("[GROUNDING] Answer may contain hallucinated content — discarding")
         out = "Pas de ressources disponibles."
         _append_turn(chat_history, query, out)
