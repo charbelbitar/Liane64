@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Liane64</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo-group">
+        <div class="logo">
+          <span class="logo-text">Liane64</span>
+        </div>
+        <p class="header-subtitle">Projet en phase de test - Conseil Départemental des Pyrénées Atlantiques.</p>
+      </div>
+      <button class="clear-btn" id="clearBtn" style="display:none;">Nouvelle conversation</button>
+    </div>
+  </header>
+
+  <main class="chat-area" id="chatArea">
+    <div class="empty-state" id="emptyState">
+      <!-- <div class="empty-icon">◈</div> -->
+      <h1>Bonjour ! Comment puis-je vous aider ?</h1>
+      <p>Assistant spécialisé en grossesse, naissance, petite enfance, enfance, adolescence et jeunesse (0-18 ans).</p>
+      <div class="suggestion-chips" id="suggestionChips">
+        <button class="chip">Quels sont les signes d'une dépression post-partum ?</button>
+        <button class="chip">Comment stimuler le développement de mon bébé ?</button>
+        <button class="chip">Quels professionnels contacter après la naissance ?</button>
+      </div>
+    </div>
+
+    <div class="messages" id="messages" style="display:none;"></div>
+  </main>
+
+  <footer class="input-bar">
+    <div class="input-inner">
+      <textarea id="inputField" class="input-field" placeholder="Posez votre question…" rows="1"></textarea>
+      <button id="micBtn" class="mic-btn" type="button" aria-label="Dicter votre question" title="Dicter votre question">🎤</button>
+      <button id="sendBtn" class="send-btn" aria-label="Envoyer">↑</button>
+    </div>
+    <p class="input-hint">Liane64 s'appuie sur l'intelligence artificielle. Vérifiez les informations importantes.</p>
+  </footer>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
