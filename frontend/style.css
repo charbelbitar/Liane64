@@ -394,6 +394,33 @@ body {
 }
 
 
+
+/* ── Mic button ── */
+.mic-btn {
+  width: 40px;
+  height: 40px;
+  background: white;
+  border: none;
+  border-radius: 10px;
+  color: #2a2f45;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.1s, color 0.15s, background 0.15s;
+}
+.mic-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
+.mic-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.mic-btn.listening {
+  color: white;
+  background: var(--error);
+  animation: pulse 1s infinite ease-in-out;
+}
+
+
 /* ── Sources as URL list ── */
 .source-list {
   list-style: none;

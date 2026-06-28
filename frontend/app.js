@@ -350,3 +350,68 @@ suggestionChips.addEventListener("click", (e) => {
 
 updateInputState();
 renderMessages();
+
+
+
+// ── Voice dictation (Web Speech API — SpeechRecognition) ──────────────────
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+const micBtn = document.getElementById("micBtn");
+let recognition = null;
+let isListening = false;
+
+if (!SpeechRecognitionAPI) {
+  micBtn.disabled = true;
+  micBtn.title = "La dictée vocale n'est pas prise en charge par ce navigateur.";
+} else {
+  micBtn.addEventListener("click", () => {
+    if (isListening) {
+      recognition.stop();
+      return;
+    }
+    startListening(micBtn);
+  });
+}
+
+function startListening(btn) {
+  recognition = new SpeechRecognitionAPI();
+  recognition.lang = "fr-FR";
+  recognition.interimResults = true;
+  recognition.continuous = false;
+
+  const baseValue = inputField.value;
+
+  recognition.onstart = () => {
+    isListening = true;
+    btn.classList.add("listening");
+    btn.textContent = "⏹";
+  };
+
+  recognition.onresult = (event) => {
+    let transcript = "";
+    for (let i = 0; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    inputField.value = (baseValue ? baseValue + " " : "") + transcript;
+    autoResize();
+    updateInputState();
+  };
+
+  recognition.onerror = (event) => {
+    console.error("Speech recognition error:", event.error);
+    if (event.error === "not-allowed") {
+      showError("Veuillez autoriser l'accès au microphone pour utiliser la dictée vocale.");
+    }
+    stopListening(btn);
+  };
+
+  recognition.onend = () => stopListening(btn);
+
+  recognition.start();
+}
+
+function stopListening(btn) {
+  isListening = false;
+  btn.classList.remove("listening");
+  btn.textContent = "🎤";
+  recognition = null;
+}
