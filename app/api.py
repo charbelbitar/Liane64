@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import traceback
+from datetime import datetime, timezone
+import json
+import pathlib
 
 from main import rag_pipeline
 from cache import purge_invalid_entries
@@ -80,3 +83,24 @@ def chat(req: ChatRequest):
 
     except Exception:
         raise HTTPException(status_code=500, detail=traceback.format_exc())
+
+
+FEEDBACK_PATH = pathlib.Path("/app/feedback/feedback.jsonl")
+FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+class FeedbackRequest(BaseModel):
+    rating: int
+    mcq_answer: Optional[str] = None
+    message_count: Optional[int] = None
+
+@app.post("/feedback")
+def feedback(req: FeedbackRequest):
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "rating": req.rating,
+        "mcq_answer": req.mcq_answer,
+        "message_count": req.message_count,
+    }
+    with open(FEEDBACK_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return {"status": "ok"}

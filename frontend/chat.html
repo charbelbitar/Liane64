@@ -48,6 +48,35 @@
 
 </div>
 
+
+<div class="modal-overlay" id="reviewOverlay" style="display:none;">
+  <div class="modal-card">
+    <h2>Votre avis compte</h2>
+    <p class="modal-subtitle">Aidez-nous à améliorer Liane64.</p>
+
+    <div class="star-rating" id="starRating">
+      <span class="star" data-value="1">★</span>
+      <span class="star" data-value="2">★</span>
+      <span class="star" data-value="3">★</span>
+      <span class="star" data-value="4">★</span>
+      <span class="star" data-value="5">★</span>
+    </div>
+
+    <p class="modal-question">Les réponses ont-elles répondu à votre besoin ?</p>
+    <div class="mcq-options" id="mcqOptions">
+      <button class="mcq-option" data-value="oui_completement">Oui, complètement</button>
+      <button class="mcq-option" data-value="oui_partiellement">Oui, partiellement</button>
+      <button class="mcq-option" data-value="non">Non</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="modal-skip" id="reviewSkip">Passer</button>
+      <button class="modal-submit" id="reviewSubmit" disabled>Envoyer</button>
+    </div>
+  </div>
+</div>
+
+
 <script src="app.js"></script>
 </body>
 </html>

@@ -334,10 +334,79 @@ inputField.addEventListener("input", () => {
   updateInputState();
 });
 
+const reviewOverlay = document.getElementById("reviewOverlay");
+const starRating    = document.getElementById("starRating");
+const mcqOptions    = document.getElementById("mcqOptions");
+const reviewSkip    = document.getElementById("reviewSkip");
+const reviewSubmit  = document.getElementById("reviewSubmit");
+
+let selectedStars = 0;
+let selectedMcq = null;
+
 clearBtn.addEventListener("click", () => {
+  if (messages.length > 0) {
+    openReviewModal();
+  } else {
+    resetChat();
+  }
+});
+
+function openReviewModal() {
+  selectedStars = 0;
+  selectedMcq = null;
+  document.querySelectorAll(".star").forEach((s) => s.classList.remove("active"));
+  document.querySelectorAll(".mcq-option").forEach((o) => o.classList.remove("active"));
+  reviewSubmit.disabled = true;
+  reviewOverlay.style.display = "flex";
+}
+
+function closeReviewModal() {
+  reviewOverlay.style.display = "none";
+}
+
+function resetChat() {
   messages = [];
   renderMessages();
   stopSpeaking();
+}
+
+starRating.addEventListener("click", (e) => {
+  if (!e.target.classList.contains("star")) return;
+  selectedStars = parseInt(e.target.dataset.value, 10);
+  document.querySelectorAll(".star").forEach((s) => {
+    s.classList.toggle("active", parseInt(s.dataset.value, 10) <= selectedStars);
+  });
+  reviewSubmit.disabled = !(selectedStars > 0);
+});
+
+mcqOptions.addEventListener("click", (e) => {
+  if (!e.target.classList.contains("mcq-option")) return;
+  selectedMcq = e.target.dataset.value;
+  document.querySelectorAll(".mcq-option").forEach((o) => o.classList.remove("active"));
+  e.target.classList.add("active");
+});
+
+reviewSkip.addEventListener("click", () => {
+  closeReviewModal();
+  resetChat();
+});
+
+reviewSubmit.addEventListener("click", async () => {
+  try {
+    await fetch(`${API_BASE}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rating: selectedStars,
+        mcq_answer: selectedMcq,
+        message_count: messages.length,
+      }),
+    });
+  } catch (e) {
+    console.error("Feedback submit failed:", e);
+  }
+  closeReviewModal();
+  resetChat();
 });
 
 suggestionChips.addEventListener("click", (e) => {
