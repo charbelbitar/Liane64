@@ -1,5 +1,6 @@
 import requests
 import os
+from metrics import EMBED_DURATION
 
 EMBEDDING_URL = os.getenv("EMBEDDING_URL", "http://embeddings:80").rstrip("/")
 
@@ -10,13 +11,14 @@ def embed(text: str) -> list[float]:
     straight to chromadb or np.dot); there is no numpy array here, so do NOT
     call .tolist() on the result.
     """
-    response = requests.post(
-        f"{EMBEDDING_URL}/embed",
-        json={"inputs": text},
-        timeout=30,
-    )
-    response.raise_for_status()
-    result = response.json()
+    with EMBED_DURATION.time():
+        response = requests.post(
+            f"{EMBEDDING_URL}/embed",
+            json={"inputs": text},
+            timeout=30,
+        )
+        response.raise_for_status()
+        result = response.json()
     # TEI's /embed endpoint always returns one embedding per input, even for
     # a single string — unwrap to the single flat vector callers expect.
     return result[0]

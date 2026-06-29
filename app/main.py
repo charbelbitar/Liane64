@@ -14,7 +14,7 @@ import time
 import threading
 from langdetect import detect_langs
 from prometheus_client import Counter
-from metrics import GROUNDING_DISCARDED, GROUNDING_LLM_CHECK_CALLS
+from metrics import GROUNDING_DISCARDED, GROUNDING_LLM_CHECK_CALLS, GROUNDING_LLM_DURATION, REWRITE_DURATION
 
 
 _tokenizer = MistralTokenizer.v3()
@@ -263,7 +263,8 @@ def translate_to_french(query: str) -> str:
         )
     }
     try:
-        translated = _llm([system_msg, {"role": "user", "content": query}], temperature=0, max_tokens=200)
+        with TRANSLATE_DURATION.time():
+            translated = _llm([system_msg, {"role": "user", "content": query}], temperature=0, max_tokens=200)
         return translated.strip() or query
     except RuntimeError as e:
         print(f"[TRANSLATE] Failed, falling back to original query for retrieval: {e}")
@@ -315,7 +316,8 @@ def rewrite_query(query, chat_history) -> tuple[str, list | None]:
         f"Historique :\n{history_text}\n\n"
         f"Nouvelle question :\n{query}\n\nRéponse :"
     )
-    content = _llm([{"role": "user", "content": prompt}])
+    with REWRITE_DURATION.time():
+        content = _llm([{"role": "user", "content": prompt}])
 
     if not content.strip().upper().startswith("OUI"):
         return query, query_emb  # same query, embedding valid
@@ -344,7 +346,8 @@ def _do_rewrite(query: str, history_text: str, last_assistant: str = "") -> str:
         f"{context}\n"
         f"Question :\n{query}\n\nQuestion reformulée :"
     )
-    return _llm([{"role": "user", "content": prompt}])
+    with REWRITE_DURATION.time():
+        return _llm([{"role": "user", "content": prompt}])
 
 
 def _extract_reponse_field(raw: str) -> str | None:
@@ -518,7 +521,8 @@ def llm_grounding_check(answer: str, context_docs: list[str]) -> bool:
         f"CONTEXTE:\n{context_text}\n\nRÉPONSE:\n{answer}\n\nVerdict (OUI/NON):"
     )
     try:
-        verdict = _llm([{"role": "user", "content": prompt}], temperature=0, max_tokens=5)
+        with GROUNDING_LLM_DURATION.time():
+            verdict = _llm([{"role": "user", "content": prompt}], temperature=0, max_tokens=5)
         return verdict.strip().upper().startswith("OUI")
     except RuntimeError as e:
         print(f"[GROUNDING-LLM] Check failed, defaulting to trust heuristic: {e}")
@@ -532,6 +536,10 @@ def _append_turn(chat_history: list, query: str, answer: str) -> None:
 
 
 def rag_pipeline(query: str, chat_history):
+    with PIPELINE_TOTAL_DURATION.time():
+        return _rag_pipeline_impl(query, chat_history)
+
+def _rag_pipeline_impl(query: str, chat_history):
 
     # Urgency detection must work regardless of input language. Every
     # keyword/regex inside detect_urgency() (URGENCY_KEYWORDS, action verbs,
@@ -624,14 +632,16 @@ def rag_pipeline(query: str, chat_history):
         retrieval_query_emb = embed(retrieval_query)
     else:
         retrieval_query_emb = query_emb if isinstance(query_emb, list) else query_emb.tolist()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        future_docs     = executor.submit(retrieve_and_rerank, retrieval_query, 15, 50, None, retrieval_query_emb)
-        future_events   = executor.submit(retrieve_events,   retrieval_query, 3, 0.50, retrieval_query_emb)
-        future_services = executor.submit(retrieve_services, retrieval_query, 3, 0.45, retrieval_query_emb)
 
-    ranked_docs        = future_docs.result()
-    relevant_events    = future_events.result()
-    relevant_services  = future_services.result()
+    with RETRIEVAL_DURATION.time():
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            future_docs     = executor.submit(retrieve_and_rerank, retrieval_query, 15, 50, None, retrieval_query_emb)
+            future_events   = executor.submit(retrieve_events,   retrieval_query, 3, 0.50, retrieval_query_emb)
+            future_services = executor.submit(retrieve_services, retrieval_query, 3, 0.45, retrieval_query_emb)
+
+        ranked_docs        = future_docs.result()
+        relevant_events    = future_events.result()
+        relevant_services  = future_services.result()
 
     MIN_RERANK_SCORE = 0.65
     ranked_docs = [d for d in ranked_docs if d.get("score", 0) >= MIN_RERANK_SCORE]
@@ -788,7 +798,8 @@ def rag_pipeline(query: str, chat_history):
 
 
     try:
-        raw = _llm(messages, temperature=0.2, max_tokens=900)
+        with LLM_GENERATION_DURATION.time():
+            raw = _llm(messages, temperature=0.2, max_tokens=900)
     except RuntimeError as e:
         print(f"[PIPELINE] LLM call failed: {e}")
         out = "Le service est temporairement indisponible. Veuillez réessayer dans quelques instants."
