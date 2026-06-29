@@ -14,7 +14,11 @@ import time
 import threading
 from langdetect import detect_langs
 from prometheus_client import Counter
-from metrics import GROUNDING_DISCARDED, GROUNDING_LLM_CHECK_CALLS, GROUNDING_LLM_DURATION, REWRITE_DURATION
+from metrics import (
+    TRANSLATE_DURATION, REWRITE_DURATION, LLM_GENERATION_DURATION,
+    GROUNDING_LLM_DURATION, RETRIEVAL_DURATION, PIPELINE_TOTAL_DURATION,
+    GROUNDING_DISCARDED, GROUNDING_LLM_CHECK_CALLS,
+)
 
 
 _tokenizer = MistralTokenizer.v3()
