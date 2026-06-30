@@ -812,7 +812,7 @@ def _rag_pipeline_impl(query: str, chat_history):
 
     try:
         with LLM_GENERATION_DURATION.time():
-            raw = _llm(messages, temperature=0.2, max_tokens=900)
+            raw = _llm(messages, temperature=0.2, max_tokens=1800)
     except RuntimeError as e:
         print(f"[PIPELINE] LLM call failed: {e}")
         out = "Le service est temporairement indisponible. Veuillez réessayer dans quelques instants."
