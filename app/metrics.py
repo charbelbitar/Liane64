@@ -18,22 +18,22 @@ EMBED_DURATION = Histogram(
 )
 TRANSLATE_DURATION = Histogram(
     "rag_translate_duration_seconds",
-    "Time spent on LLM translation calls (urgency/retrieval translation)"
+    "Time spent on LLM translation calls (urgency/retrieval translation)",
     buckets=[0.5, 1, 2, 5, 10, 20, 30, float("inf")]
 )
 REWRITE_DURATION = Histogram(
     "rag_rewrite_duration_seconds",
-    "Time spent on query rewrite/topic-similarity LLM calls"
+    "Time spent on query rewrite/topic-similarity LLM calls",
     buckets=[0.5, 1, 2, 5, 10, 20, 30, float("inf")]
 )
 LLM_GENERATION_DURATION = Histogram(
     "rag_llm_generation_duration_seconds",
-    "Time spent on the main answer-generation LLM call"
+    "Time spent on the main answer-generation LLM call",
     buckets=[1, 2, 5, 10, 15, 20, 30, 45, 60, 90, 120, float("inf")]
 )
 GROUNDING_LLM_DURATION = Histogram(
     "rag_grounding_llm_duration_seconds",
-    "Time spent on the LLM grounding-check tiebreaker call"
+    "Time spent on the LLM grounding-check tiebreaker call",
     buckets=[0.5, 1, 2, 5, 10, 20, float("inf")]
 )
 RETRIEVAL_DURATION = Histogram(
@@ -42,6 +42,6 @@ RETRIEVAL_DURATION = Histogram(
 )
 PIPELINE_TOTAL_DURATION = Histogram(
     "rag_pipeline_total_duration_seconds",
-    "End-to-end time for a full rag_pipeline() call"
+    "End-to-end time for a full rag_pipeline() call",
     buckets=[1, 2, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, float("inf")]
 )
