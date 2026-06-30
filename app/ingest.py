@@ -1,34 +1,3 @@
-"""
-ingest.py — populates the three Chroma collections from pre-embedded JSONL files.
- 
-Layout expected under DATA_DIR (default /app/data, mounted as a volume — see
-docker-compose.yml):
- 
-  1000_premiers_jours/1000_premiers_jours_embeddings.jsonl   ─┐
-  mpedia/mpedia_embeddings.jsonl                              ├─► MPJ_MPEDIA_PAPOTO_CAF_BGE
-  papoto/<...>_embeddings.jsonl                               ─┘
-  events/embedded_events_caf64.jsonl                          ──► events_caf64
-  services_cd64/sdsei/embedded_sdsei.jsonl                    ─┐
-  services_cd64/vifs/embedded_vifs.jsonl                      ─┴─► servicess
- 
-Each JSONL line looks like:
-  {"id": "...", "type": "text", "text": "...",
-   "metadata": {"chunk_id": 1, "source": "...", "url": "...",
-                "mots_clés": ["a", "b"], "stade": "grossesse", ...},
-   "embedding": [0.0123, ...]}
- 
-A 4th collection (the answer cache) is created/maintained by the backend's
-cache.py during normal operation — this script does not touch it.
- 
-No call to the `embeddings` (TEI) container happens here: the vectors are
-already in the JSONL files, so we upsert them as-is.
- 
-USAGE
------
-  docker compose run --rm backend python ingest.py --collection all --reset
-  docker compose run --rm backend python ingest.py --collection events
-"""
- 
 import os
 import sys
 import json

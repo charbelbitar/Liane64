@@ -320,8 +320,12 @@ def rewrite_query(query, chat_history) -> tuple[str, list | None]:
         f"Historique :\n{history_text}\n\n"
         f"Nouvelle question :\n{query}\n\nRéponse :"
     )
-    with REWRITE_DURATION.time():
-        content = _llm([{"role": "user", "content": prompt}])
+    try:
+        with REWRITE_DURATION.time():
+            content = _llm([{"role": "user", "content": prompt}])
+    except RuntimeError as e:
+        print(f"[REWRITE] Ambiguous-topic check failed, treating as same topic: {e}")
+        content = "OUI"  # fail toward rewriting, the safer default given the alternative is silently skipping context
 
     if not content.strip().upper().startswith("OUI"):
         return query, query_emb  # same query, embedding valid
@@ -350,8 +354,12 @@ def _do_rewrite(query: str, history_text: str, last_assistant: str = "") -> str:
         f"{context}\n"
         f"Question :\n{query}\n\nQuestion reformulée :"
     )
-    with REWRITE_DURATION.time():
-        return _llm([{"role": "user", "content": prompt}])
+    try:
+        with REWRITE_DURATION.time():
+            return _llm([{"role": "user", "content": prompt}])
+    except RuntimeError as e:
+        print(f"[REWRITE] Failed, falling back to original query: {e}")
+        return query
 
 
 def _extract_reponse_field(raw: str) -> str | None:
