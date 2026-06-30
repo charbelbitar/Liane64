@@ -648,6 +648,7 @@ def _rag_pipeline_impl(query: str, chat_history):
         relevant_services  = future_services.result()
 
     MIN_RERANK_SCORE = 0.65
+    print(f"[RERANK] Scores before filtering: {[round(d.get('score', 0), 3) for d in ranked_docs]}")
     ranked_docs = [d for d in ranked_docs if d.get("score", 0) >= MIN_RERANK_SCORE]
 
     # Only refuse outright if NOTHING relevant was found anywhere — main KB,
