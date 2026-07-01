@@ -139,7 +139,7 @@ def ingest_main_kb(client, reset: bool):
  
 def ingest_events(client, reset: bool):
     print(f"\n=== Ingesting events ({EVENTS_COLLECTION_NAME}) ===")
-    path = DATA_DIR / "events" / "embedded_events_caf64.jsonl"
+    path = DATA_DIR / "CAF64_events" / "embedded_events_caf64.jsonl"
  
     ids, docs, embeddings, metadatas = load_records([path])
     collection = get_or_reset_collection(client, EVENTS_COLLECTION_NAME, reset)
@@ -150,8 +150,8 @@ def ingest_events(client, reset: bool):
 def ingest_services(client, reset: bool):
     print(f"\n=== Ingesting services ({SERVICES_COLLECTION_NAME}) ===")
     paths = [
-        DATA_DIR / "services_cd64" / "sdsei" / "embedded_sdsei.jsonl",
-        DATA_DIR / "services_cd64" / "vifs" / "embedded_vifs.jsonl",
+        DATA_DIR / "CD64_services" / "sdsei" / "embedded_sdsei.jsonl",
+        DATA_DIR / "CD64_services" / "vifs" / "embedded_vifs.jsonl",
     ]
  
     ids, docs, embeddings, metadatas = load_records(paths)
