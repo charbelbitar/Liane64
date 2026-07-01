@@ -416,7 +416,7 @@ body.chat-layout {
   border-radius: 20px;
   color: white;
   font-size: 0.75rem;
-  padding: 0.25rem 0.7rem;
+  padding: 0.4rem 1rem;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }

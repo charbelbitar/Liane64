@@ -224,7 +224,7 @@ function stopSpeaking() {
 function buildBubbleFeedbackBtn() {
   const btn = document.createElement("button");
   btn.className = "bubble-feedback-btn";
-  btn.textContent = "💬 Donner mon avis";
+  btn.textContent = "💬 Évaluer cette réponse";
   btn.title = "Donner votre avis sur cette réponse";
   btn.addEventListener("click", () => {
     feedbackOverlay.style.display = "flex";
