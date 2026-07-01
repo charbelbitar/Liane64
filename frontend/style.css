@@ -181,6 +181,8 @@ body.chat-layout {
   background: white;
   border-bottom-left-radius: 4px;
   color: #2a2f45;
+  position: relative;
+  padding-top: 2rem; 
 }
 
 /* Markdown inside assistant bubble */
@@ -375,26 +377,52 @@ body.chat-layout {
 
 /* ── Speak button (inside assistant bubble) ── */
 .speak-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  margin-top: 0.4rem;
-  background: var(--surface-2);
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 26px;
+  height: 26px;
+  margin-top: 0;
+  background: #f0f0f5;
   border: 1px solid var(--border);
   border-radius: 50%;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.speak-btn:hover { color: var(--text); border-color: var(--accent); }
+.speak-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .speak-btn.speaking {
   color: var(--accent);
   border-color: var(--accent);
   background: var(--accent-dim);
   animation: pulse 1.4s infinite ease-in-out;
+}
+
+.bubble-feedback-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.1rem;
+  background: none;
+  border: 1px solid #e0e0ea;
+  border-radius: 20px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.bubble-feedback-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 @keyframes pulse {

@@ -95,11 +95,17 @@ function renderMessages() {
       p.textContent = msg.content;
       bubble.appendChild(p);
     } else {
+      // speak button — top right corner
+      bubble.appendChild(buildSpeakButton(msg.content, msg.metadata?.language));
+      // metadata badges
       if (msg.metadata) bubble.appendChild(buildMetaBar(msg.metadata));
+      // markdown content
       const contentDiv = document.createElement("div");
       contentDiv.innerHTML = renderMarkdown(msg.content);
       bubble.appendChild(contentDiv);
-      bubble.appendChild(buildSpeakButton(msg.content, msg.metadata?.language));
+      // per-bubble feedback button
+      bubble.appendChild(buildBubbleFeedbackBtn());
+      // sources
       if (msg.sources && msg.sources.length > 0) bubble.appendChild(buildSources(msg.sources));
     }
 
@@ -213,6 +219,17 @@ function stopSpeaking() {
   }
   currentUtterance = null;
   currentSpeakBtn  = null;
+}
+
+function buildBubbleFeedbackBtn() {
+  const btn = document.createElement("button");
+  btn.className = "bubble-feedback-btn";
+  btn.textContent = "💬 Donner mon avis";
+  btn.title = "Donner votre avis sur cette réponse";
+  btn.addEventListener("click", () => {
+    feedbackOverlay.style.display = "flex";
+  });
+  return btn;
 }
 
 function buildSpeakButton(text, language) {
