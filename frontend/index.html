@@ -2,46 +2,50 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Liane64</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body class="landing-body">
 
-<div class="app">
+  <main class="landing-screen">
+    <div class="landing-card">
 
-  <header class="header">
-    <div class="header-inner">
-      <div class="logo-group">
-        <div class="logo">
-          <span class="logo-text">Liane64</span>
+      <div class="landing-logo">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="https://upload.wikimedia.org/wikipedia/fr/e/e1/Logo_Pyr%C3%A9n%C3%A9es_Atlantiques_2015.svg" aria-hidden="true">
+          <circle cx="20" cy="20" r="20" fill="#6c8fff" opacity="0.12"/>
+          <path d="M20 8 C14 8 10 13 10 18 C10 23 14 26 20 28 C26 26 30 23 30 18 C30 13 26 8 20 8Z" fill="#6c8fff" opacity="0.25"/>
+          <path d="M20 10 C20 10 16 15 16 20 C16 24 18 27 20 29 C22 27 24 24 24 20 C24 15 20 10 20 10Z" fill="#6c8fff"/>
+          <path d="M13 16 Q20 20 27 16" stroke="#6c8fff" stroke-width="1.5" fill="none" opacity="0.6"/>
+          <path d="M12 21 Q20 25 28 21" stroke="#6c8fff" stroke-width="1.5" fill="none" opacity="0.4"/>
+        </svg>
+        <div class="landing-logo-text">
+          <span class="landing-logo-name">Liane64</span>
+          <span class="landing-logo-dept">Conseil Départemental 64</span>
         </div>
-        <p class="header-subtitle">Projet en phase de test - Conseil Départemental des Pyrénées Atlantiques.</p>
       </div>
-    </div>
-  </header>
 
-  <main class="landing-main">
-    <div class="landing-content">
-      <p class="landing-text-title">
-        Bienvenue sur Liane64
+      <div class="landing-divider"></div>
+
+      <h1 class="landing-headline">Votre assistant périnatalité</h1>
+
+      <p class="landing-desc">
+        Posez vos questions sur la grossesse, la naissance et le développement de l'enfant jusqu'à 18 ans. Disponible pour les parents et les professionnels de santé.
       </p>
-      <p class="landing-text">
-        Liane64 est un assistant conversationnel reposant sur l'intelligence artificielle. 
-        Les réponses qu'il fournit sont générées à partir des informations issues principalement 
-        de <strong>MPEDIA.fr</strong> et de <strong>1000-premiers-jours.fr</strong>.
-        Cet outil accompagne les futurs parents, les parents d'enfants de la naissance jusqu'à 18 ans, 
-        ainsi que les professionnels de santé. Il apporte des informations relatives à la santé physique
-        et à la santé mentale des enfants et de leurs parents.
-        Liane64 ne remplace pas l'avis d'un professionnel de santé et ne fournit ni diagnostic médical 
-        ni prise en charge. Les informations délivrées sont fournies à titre informatif et ne doivent pas 
-        se substituer à une consultation médicale.
-      </p>
-      <a href="chat.html" class="cta-btn">Lancer le chatbot</a>
+
+      <a href="chat.html" class="landing-cta">
+        Lancer le chatbot
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+
+      <p class="landing-badge">Projet en phase de test · CD64</p>
+
     </div>
   </main>
-
-</div>
 
 </body>
 </html>
