@@ -24,6 +24,10 @@
 }
 
 html, body {
+  height: 100%;
+}
+
+body.chat-layout {
   position: fixed;
   inset: 0;
   width: 100%;
