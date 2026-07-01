@@ -1,16 +1,21 @@
 const API_BASE = "/api";
 
-let messages = [];  
-let loading = false;
+let messages = [];
+let loading  = false;
 
+// ── DOM refs ──────────────────────────────────────────────────────────────
 const chatArea       = document.getElementById("chatArea");
-const emptyState      = document.getElementById("emptyState");
-const messagesEl      = document.getElementById("messages");
-const inputField      = document.getElementById("inputField");
-const sendBtn         = document.getElementById("sendBtn");
-const clearBtn        = document.getElementById("clearBtn");
+const emptyState     = document.getElementById("emptyState");
+const messagesEl     = document.getElementById("messages");
+const inputField     = document.getElementById("inputField");
+const sendBtn        = document.getElementById("sendBtn");
+const clearBtn       = document.getElementById("clearBtn");
 const suggestionChips = document.getElementById("suggestionChips");
+const feedbackBtn    = document.getElementById("feedbackBtn");
+const feedbackOverlay = document.getElementById("feedbackOverlay");
+const feedbackClose  = document.getElementById("feedbackClose");
 
+// ── Label maps ────────────────────────────────────────────────────────────
 const ROLE_LABELS = {
   parent:        "👨‍👩‍👧 Parent",
   professionnel: "🏥 Professionnel",
@@ -25,16 +30,16 @@ const PHASE_LABELS = {
   ambigu:          "❓ Indéterminé",
 };
 
+// ── Markdown renderer ─────────────────────────────────────────────────────
 function renderMarkdown(text) {
   let html = escapeHtml(text);
-
   html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code}</code></pre>`);
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
 
   const lines = html.split("\n");
-  let out = [];
+  const out = [];
   let inList = false;
   for (const line of lines) {
     const m = line.match(/^\s*[-•]\s+(.*)/);
@@ -56,25 +61,27 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ── Input state ───────────────────────────────────────────────────────────
 function updateInputState() {
   inputField.disabled = loading;
   sendBtn.disabled = loading || inputField.value.trim() === "";
 }
 
+// ── Rendering ─────────────────────────────────────────────────────────────
 function renderMessages() {
   updateInputState();
+
   if (messages.length === 0) {
-    emptyState.style.display = "flex";
-    messagesEl.style.display = "none";
-    clearBtn.style.display = "none";
+    emptyState.style.display  = "flex";
+    messagesEl.style.display  = "none";
+    clearBtn.style.display    = "none";
     return;
   }
 
   emptyState.style.display = "none";
   messagesEl.style.display = "flex";
-  clearBtn.style.display = "inline-block";
-
-  messagesEl.innerHTML = "";
+  clearBtn.style.display   = "inline-block";
+  messagesEl.innerHTML     = "";
 
   messages.forEach((msg) => {
     const row = document.createElement("div");
@@ -88,28 +95,19 @@ function renderMessages() {
       p.textContent = msg.content;
       bubble.appendChild(p);
     } else {
-      // metadata badges
       if (msg.metadata) bubble.appendChild(buildMetaBar(msg.metadata));
-      // markdown content
       const contentDiv = document.createElement("div");
       contentDiv.innerHTML = renderMarkdown(msg.content);
       bubble.appendChild(contentDiv);
-      // speak button
       bubble.appendChild(buildSpeakButton(msg.content, msg.metadata?.language));
-      // sources
-      if (msg.sources && msg.sources.length > 0) {
-        bubble.appendChild(buildSources(msg.sources));
-      }
+      if (msg.sources && msg.sources.length > 0) bubble.appendChild(buildSources(msg.sources));
     }
 
     row.appendChild(bubble);
     messagesEl.appendChild(row);
   });
 
-  if (loading) {
-    messagesEl.appendChild(buildTypingIndicator());
-  }
-
+  if (loading) messagesEl.appendChild(buildTypingIndicator());
   chatArea.scrollTop = chatArea.scrollHeight;
 }
 
@@ -118,15 +116,9 @@ function buildMetaBar(meta) {
   const isUrgent = meta.urgence === "oui";
   bar.className = `meta-bar ${isUrgent ? "meta-urgent" : ""}`;
 
-  if (isUrgent) {
-    bar.appendChild(makePill("🚨 Urgence", "urgent"));
-  }
-  if (meta.role_detecte) {
-    bar.appendChild(makePill(ROLE_LABELS[meta.role_detecte] || meta.role_detecte));
-  }
-  if (meta.phase) {
-    bar.appendChild(makePill(PHASE_LABELS[meta.phase] || meta.phase));
-  }
+  if (isUrgent)          bar.appendChild(makePill("🚨 Urgence", "urgent"));
+  if (meta.role_detecte) bar.appendChild(makePill(ROLE_LABELS[meta.role_detecte] || meta.role_detecte));
+  if (meta.phase)        bar.appendChild(makePill(PHASE_LABELS[meta.phase] || meta.phase));
   if (meta.language) {
     const lang = meta.language.charAt(0).toUpperCase() + meta.language.slice(1);
     bar.appendChild(makePill(`🌐 ${lang}`));
@@ -142,7 +134,7 @@ function makePill(text, extraClass = "") {
 }
 
 function buildSources(urls) {
-  const wrap = document.createElement("div");
+  const wrap   = document.createElement("div");
   wrap.className = "sources";
 
   const toggle = document.createElement("button");
@@ -152,13 +144,11 @@ function buildSources(urls) {
   const list = document.createElement("ul");
   list.className = "source-list";
   list.style.display = "none";
+
   urls.forEach((url) => {
     const li = document.createElement("li");
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.textContent = url;
+    const a  = document.createElement("a");
+    a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = url;
     li.appendChild(a);
     list.appendChild(li);
   });
@@ -175,84 +165,10 @@ function buildSources(urls) {
   return wrap;
 }
 
-
-let currentUtterance = null;
-let currentSpeakBtn = null;
- 
-function stripMarkdownForSpeech(text) {
-  return text
-    .replace(/```[\s\S]*?```/g, "")   
-    .replace(/`([^`]+)`/g, "$1")      
-    .replace(/\*\*(.+?)\*\*/g, "$1")  
-    .replace(/\*(.+?)\*/g, "$1")      
-    .replace(/^\s*[-•]\s+/gm, "")   
-    .trim();
-}
- 
-function langToBCP47(language) {
-  const map = {
-    francais: "fr-FR", french: "fr-FR",
-    english: "en-US", anglais: "en-US",
-    arabic: "ar-SA", arabe: "ar-SA",
-    spanish: "es-ES", espagnol: "es-ES",
-  };
-  if (!language) return "fr-FR"; 
-  return map[language.toLowerCase()] || "fr-FR";
-}
- 
-function stopSpeaking() {
-  window.speechSynthesis.cancel();
-  if (currentSpeakBtn) {
-    currentSpeakBtn.classList.remove("speaking");
-    currentSpeakBtn.textContent = "🔊";
-  }
-  currentUtterance = null;
-  currentSpeakBtn = null;
-}
- 
-function buildSpeakButton(text, language) {
-  const btn = document.createElement("button");
-  btn.className = "speak-btn";
-  btn.textContent = "🔊";
-  btn.title = "Lire à voix haute";
- 
-  btn.addEventListener("click", () => {
-    const isThisOneSpeaking = currentSpeakBtn === btn;
- 
-    stopSpeaking();
- 
-    if (isThisOneSpeaking) return; 
- 
-    if (!("speechSynthesis" in window)) {
-      alert("La lecture vocale n'est pas prise en charge par ce navigateur.");
-      return;
-    }
- 
-    const utterance = new SpeechSynthesisUtterance(stripMarkdownForSpeech(text));
-    utterance.lang = langToBCP47(language);
-    utterance.rate = 1;
- 
-    utterance.onend = () => stopSpeaking();
-    utterance.onerror = () => stopSpeaking();
- 
-    currentUtterance = utterance;
-    currentSpeakBtn = btn;
-    btn.classList.add("speaking");
-    btn.textContent = "⏹";
- 
-    window.speechSynthesis.speak(utterance);
-  });
- 
-  return btn;
-}
-
 function buildTypingIndicator() {
   const row = document.createElement("div");
   row.className = "message-row assistant-row";
-  row.innerHTML = `
-    <div class="bubble assistant-bubble typing">
-      <span></span><span></span><span></span>
-    </div>`;
+  row.innerHTML = `<div class="bubble assistant-bubble typing"><span></span><span></span><span></span></div>`;
   return row;
 }
 
@@ -264,6 +180,74 @@ function showError(message) {
   chatArea.scrollTop = chatArea.scrollHeight;
 }
 
+// ── Text-to-speech ────────────────────────────────────────────────────────
+let currentUtterance = null;
+let currentSpeakBtn  = null;
+
+function stripMarkdownForSpeech(text) {
+  return text
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/^\s*[-•]\s+/gm, "")
+    .trim();
+}
+
+function langToBCP47(language) {
+  const map = {
+    francais: "fr-FR", french: "fr-FR",
+    english: "en-US",  anglais: "en-US",
+    arabic: "ar-SA",   arabe: "ar-SA",
+    spanish: "es-ES",  espagnol: "es-ES",
+  };
+  if (!language) return "fr-FR";
+  return map[language.toLowerCase()] || "fr-FR";
+}
+
+function stopSpeaking() {
+  window.speechSynthesis.cancel();
+  if (currentSpeakBtn) {
+    currentSpeakBtn.classList.remove("speaking");
+    currentSpeakBtn.textContent = "🔊";
+  }
+  currentUtterance = null;
+  currentSpeakBtn  = null;
+}
+
+function buildSpeakButton(text, language) {
+  const btn = document.createElement("button");
+  btn.className = "speak-btn";
+  btn.textContent = "🔊";
+  btn.title = "Lire à voix haute";
+
+  btn.addEventListener("click", () => {
+    const isThisOneSpeaking = currentSpeakBtn === btn;
+    stopSpeaking();
+    if (isThisOneSpeaking) return;
+
+    if (!("speechSynthesis" in window)) {
+      alert("La lecture vocale n'est pas prise en charge par ce navigateur.");
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(stripMarkdownForSpeech(text));
+    utterance.lang = langToBCP47(language);
+    utterance.rate = 1;
+    utterance.onend  = () => stopSpeaking();
+    utterance.onerror = () => stopSpeaking();
+
+    currentUtterance = utterance;
+    currentSpeakBtn  = btn;
+    btn.classList.add("speaking");
+    btn.textContent = "⏹";
+    window.speechSynthesis.speak(utterance);
+  });
+
+  return btn;
+}
+
+// ── Networking ────────────────────────────────────────────────────────────
 async function sendMessage(text) {
   messages.push({ role: "user", content: text });
   loading = true;
@@ -284,10 +268,7 @@ async function sendMessage(text) {
 
     if (!res.ok) {
       let detail = `HTTP ${res.status}`;
-      try {
-        const err = await res.json();
-        if (err.detail) detail = err.detail;
-      } catch (_) {}
+      try { const err = await res.json(); if (err.detail) detail = err.detail; } catch (_) {}
       throw new Error(detail);
     }
 
@@ -307,6 +288,7 @@ async function sendMessage(text) {
   }
 }
 
+// ── Input handling ────────────────────────────────────────────────────────
 function handleSend() {
   const text = inputField.value.trim();
   if (!text || loading) return;
@@ -323,90 +305,15 @@ function autoResize() {
 sendBtn.addEventListener("click", handleSend);
 
 inputField.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    handleSend();
-  }
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
 });
 
-inputField.addEventListener("input", () => {
-  autoResize();
-  updateInputState();
-});
-
-const reviewOverlay = document.getElementById("reviewOverlay");
-const starRating    = document.getElementById("starRating");
-const mcqOptions    = document.getElementById("mcqOptions");
-const reviewSkip    = document.getElementById("reviewSkip");
-const reviewSubmit  = document.getElementById("reviewSubmit");
-
-let selectedStars = 0;
-let selectedMcq = null;
+inputField.addEventListener("input", () => { autoResize(); updateInputState(); });
 
 clearBtn.addEventListener("click", () => {
-  if (messages.length > 0) {
-    openReviewModal();
-  } else {
-    resetChat();
-  }
-});
-
-function openReviewModal() {
-  selectedStars = 0;
-  selectedMcq = null;
-  document.querySelectorAll(".star").forEach((s) => s.classList.remove("active"));
-  document.querySelectorAll(".mcq-option").forEach((o) => o.classList.remove("active"));
-  reviewSubmit.disabled = true;
-  reviewOverlay.style.display = "flex";
-}
-
-function closeReviewModal() {
-  reviewOverlay.style.display = "none";
-}
-
-function resetChat() {
   messages = [];
   renderMessages();
   stopSpeaking();
-}
-
-starRating.addEventListener("click", (e) => {
-  if (!e.target.classList.contains("star")) return;
-  selectedStars = parseInt(e.target.dataset.value, 10);
-  document.querySelectorAll(".star").forEach((s) => {
-    s.classList.toggle("active", parseInt(s.dataset.value, 10) <= selectedStars);
-  });
-  reviewSubmit.disabled = !(selectedStars > 0);
-});
-
-mcqOptions.addEventListener("click", (e) => {
-  if (!e.target.classList.contains("mcq-option")) return;
-  selectedMcq = e.target.dataset.value;
-  document.querySelectorAll(".mcq-option").forEach((o) => o.classList.remove("active"));
-  e.target.classList.add("active");
-});
-
-reviewSkip.addEventListener("click", () => {
-  closeReviewModal();
-  resetChat();
-});
-
-reviewSubmit.addEventListener("click", async () => {
-  try {
-    await fetch(`${API_BASE}/feedback`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        rating: selectedStars,
-        mcq_answer: selectedMcq,
-        message_count: messages.length,
-      }),
-    });
-  } catch (e) {
-    console.error("Feedback submit failed:", e);
-  }
-  closeReviewModal();
-  resetChat();
 });
 
 suggestionChips.addEventListener("click", (e) => {
@@ -414,29 +321,35 @@ suggestionChips.addEventListener("click", (e) => {
     inputField.value = e.target.textContent;
     inputField.focus();
     autoResize();
+    updateInputState();
   }
 });
 
-updateInputState();
-renderMessages();
+// ── Feedback modal (Microsoft Forms) ─────────────────────────────────────
+feedbackBtn.addEventListener("click", () => {
+  feedbackOverlay.style.display = "flex";
+});
 
+feedbackClose.addEventListener("click", () => {
+  feedbackOverlay.style.display = "none";
+});
 
+feedbackOverlay.addEventListener("click", (e) => {
+  if (e.target === feedbackOverlay) feedbackOverlay.style.display = "none";
+});
 
-// ── Voice dictation (Web Speech API — SpeechRecognition) ──────────────────
+// ── Voice dictation ───────────────────────────────────────────────────────
 const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 const micBtn = document.getElementById("micBtn");
-let recognition = null;
-let isListening = false;
+let recognition  = null;
+let isListening  = false;
 
 if (!SpeechRecognitionAPI) {
   micBtn.disabled = true;
   micBtn.title = "La dictée vocale n'est pas prise en charge par ce navigateur.";
 } else {
   micBtn.addEventListener("click", () => {
-    if (isListening) {
-      recognition.stop();
-      return;
-    }
+    if (isListening) { recognition.stop(); return; }
     startListening(micBtn);
   });
 }
@@ -457,9 +370,7 @@ function startListening(btn) {
 
   recognition.onresult = (event) => {
     let transcript = "";
-    for (let i = 0; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
-    }
+    for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript;
     inputField.value = (baseValue ? baseValue + " " : "") + transcript;
     autoResize();
     updateInputState();
@@ -467,14 +378,11 @@ function startListening(btn) {
 
   recognition.onerror = (event) => {
     console.error("Speech recognition error:", event.error);
-    if (event.error === "not-allowed") {
-      showError("Veuillez autoriser l'accès au microphone pour utiliser la dictée vocale.");
-    }
+    if (event.error === "not-allowed") showError("Veuillez autoriser l'accès au microphone.");
     stopListening(btn);
   };
 
   recognition.onend = () => stopListening(btn);
-
   recognition.start();
 }
 
@@ -484,3 +392,7 @@ function stopListening(btn) {
   btn.textContent = "🎤";
   recognition = null;
 }
+
+// ── Init ──────────────────────────────────────────────────────────────────
+updateInputState();
+renderMessages();

@@ -18,7 +18,10 @@
         </div>
         <p class="header-subtitle">Projet en phase de test - Conseil Départemental des Pyrénées Atlantiques.</p>
       </div>
-      <button class="clear-btn" id="clearBtn" style="display:none;">Nouvelle conversation</button>
+      <div class="header-actions">
+        <button class="feedback-btn" id="feedbackBtn">💬 Donner mon avis</button>
+        <button class="clear-btn" id="clearBtn" style="display:none;">Nouvelle conversation</button>
+      </div>
     </div>
   </header>
 
@@ -32,7 +35,6 @@
         <button class="chip">Quels professionnels contacter après la naissance ?</button>
       </div>
     </div>
-
     <div class="messages" id="messages" style="display:none;"></div>
   </main>
 
@@ -47,34 +49,24 @@
 
 </div>
 
-
-<div class="modal-overlay" id="reviewOverlay" style="display:none;">
-  <div class="modal-card">
-    <h2>Votre avis compte</h2>
-    <p class="modal-subtitle">Aidez-nous à améliorer Liane64.</p>
-
-    <div class="star-rating" id="starRating">
-      <span class="star" data-value="1">★</span>
-      <span class="star" data-value="2">★</span>
-      <span class="star" data-value="3">★</span>
-      <span class="star" data-value="4">★</span>
-      <span class="star" data-value="5">★</span>
+<!-- Microsoft Forms feedback modal -->
+<div class="modal-overlay" id="feedbackOverlay" style="display:none;">
+  <div class="modal-card modal-card--form">
+    <div class="modal-form-header">
+      <span>Votre avis</span>
+      <button class="modal-close" id="feedbackClose" aria-label="Fermer">✕</button>
     </div>
-
-    <p class="modal-question">Les réponses ont-elles répondu à votre besoin ?</p>
-    <div class="mcq-options" id="mcqOptions">
-      <button class="mcq-option" data-value="oui_completement">Oui, complètement</button>
-      <button class="mcq-option" data-value="oui_partiellement">Oui, partiellement</button>
-      <button class="mcq-option" data-value="non">Non</button>
-    </div>
-
-    <div class="modal-actions">
-      <button class="modal-skip" id="reviewSkip">Passer</button>
-      <button class="modal-submit" id="reviewSubmit" disabled>Envoyer</button>
-    </div>
+    <iframe
+      src="https://forms.cloud.microsoft/e/0pvv1SGJ9s"
+      width="100%"
+      height="100%"
+      frameborder="0"
+      title="Formulaire d'avis Liane64"
+      allowfullscreen>
+      Chargement du formulaire…
+    </iframe>
   </div>
 </div>
-
 
 <script src="app.js"></script>
 </body>
