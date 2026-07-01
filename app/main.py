@@ -839,32 +839,34 @@ def _rag_pipeline_impl(query: str, chat_history):
     extra_words = sum(len(e.get("text", "").split()) for e in (relevant_events or []))
     extra_words += sum(len(s.get("text", "").split()) for s in (relevant_services or []))
  
-    overlap = _compute_overlap(answer, context_parts)
-    print(f"[GROUNDING] Lexical overlap score: {overlap:.2f}")
+    if context_parts:
+        overlap = _compute_overlap(answer, context_parts)
+        print(f"[GROUNDING] Lexical overlap score: {overlap:.2f}")
+        if overlap < 0.15:
+            grounded = False
+        elif overlap > 0.40:
+            grounded = True
+        else:
+            print("[GROUNDING] Borderline — escalating to LLM check")
+            GROUNDING_LLM_CHECK_CALLS.inc()
+            grounded = llm_grounding_check(answer, context_parts)
 
-    if overlap < 0.15:
-        grounded = False
-    elif overlap > 0.40:
-        grounded = True
+        if not grounded:
+            GROUNDING_DISCARDED.inc()
+            print("[GROUNDING] Answer may contain hallucinated content — discarding")
+            out = "Pas de ressources disponibles."
+            _append_turn(chat_history, query, out)
+            return out, {
+                "language": parsed.get("language", "ambigu"),
+                "niveau_langue": parsed.get("niveau_langue", "ambigu"),
+                "role_detecte": parsed.get("role_detecte", "ambigu"),
+                "phase": parsed.get("phase", "ambigu"),
+                "urgence": parsed.get("urgence", "non"),
+                "reponse": out,
+                "sources": []
+            }
     else:
-        print("[GROUNDING] Borderline heuristic score — escalating to LLM check")
-        GROUNDING_LLM_CHECK_CALLS.inc()
-        grounded = llm_grounding_check(answer, context_parts)
-
-    if not grounded:
-        GROUNDING_DISCARDED.inc()
-        print("[GROUNDING] Answer may contain hallucinated content — discarding")
-        out = "Pas de ressources disponibles."
-        _append_turn(chat_history, query, out)
-        return out, {
-            "language": parsed.get("language", "ambigu"),
-            "niveau_langue": parsed.get("niveau_langue", "ambigu"),
-            "role_detecte": parsed.get("role_detecte", "ambigu"),
-            "phase": parsed.get("phase", "ambigu"),
-            "urgence": parsed.get("urgence", "non"),
-            "reponse": out,
-            "sources": []
-        }
+        print("[GROUNDING] No document context — skipping overlap check (events/services only answer)")
 
     # Don't cache answers built from events — they're tied to a specific date
     # and the cache has no expiry mechanism, so a cached answer recommending
