@@ -411,10 +411,10 @@ body.chat-layout {
   gap: 0.3rem;
   margin-top: 1rem;
   margin-bottom: 1rem;
-  background: red;
+  background: #f94449;
   border: 1px solid #e0e0ea;
   border-radius: 20px;
-  color: #2a2f45;
+  color: white;
   font-size: 0.75rem;
   padding: 0.25rem 0.7rem;
   cursor: pointer;
