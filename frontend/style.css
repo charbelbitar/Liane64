@@ -378,12 +378,12 @@ body.chat-layout {
 /* ── Speak button (inside assistant bubble) ── */
 .speak-btn {
   position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  width: 26px;
-  height: 26px;
+  top: 1rem;
+  right: 1rem;
+  width: 30px;
+  height: 30px;
   margin-top: 0;
-  background: #f0f0f5;
+  background: #2a2f45;
   border: 1px solid var(--border);
   border-radius: 50%;
   color: var(--text-muted);
@@ -409,12 +409,12 @@ body.chat-layout {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  margin-top: 0.75rem;
-  margin-bottom: 0.1rem;
-  background: none;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  background: red;
   border: 1px solid #e0e0ea;
   border-radius: 20px;
-  color: var(--text-muted);
+  color: #2a2f45;
   font-size: 0.75rem;
   padding: 0.25rem 0.7rem;
   cursor: pointer;
