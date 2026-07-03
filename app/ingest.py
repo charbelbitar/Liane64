@@ -128,7 +128,7 @@ def upsert_in_batches(collection, ids, docs, embeddings, metadatas, batch_size=B
 # ---------------------------------------------------------------------------
 def ingest_main_kb(client, reset: bool):
     print(f"\n=== Ingesting main KB ({MAIN_COLLECTION_NAME}) ===")
-    source_dirs = ["1000_premiers_jours", "mpedia", "papoto"]
+    source_dirs = ["1000_premiers_jours", "mpedia", "papoto", "CAF64_articles"]
     paths = [find_one(DATA_DIR / d, "*_embeddings.jsonl") for d in source_dirs]
  
     ids, docs, embeddings, metadatas = load_records(paths)
