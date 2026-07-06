@@ -92,6 +92,15 @@ body.chat-layout {
 .clear-btn:hover { color: var(--text); border-color: var(--accent); }
 
 
+.assistant-bubble a {
+  color: var(--accent);
+  text-decoration: underline;
+  word-break: break-all;
+}
+.assistant-bubble a:hover {
+  opacity: 0.8;
+}
+
 /* ── Chat layout ── */
 .app {
   display: flex;

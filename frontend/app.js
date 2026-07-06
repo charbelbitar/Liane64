@@ -38,6 +38,12 @@ function renderMarkdown(text) {
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
 
+  // hyperlink detection (urls))
+  html = html.replace(
+    /(https?:\/\/[^\s<>"')\]]+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+  );
+
   const lines = html.split("\n");
   const out = [];
   let inList = false;
