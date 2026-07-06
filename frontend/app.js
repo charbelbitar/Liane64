@@ -294,15 +294,7 @@ function buildSpeakButton(text, language) {
 
 // ── Networking ────────────────────────────────────────────────────────────
 async function sendMessage(text) {
-  // messages.push({ role: "user", content: text });
-  messages.push({
-    role: "assistant",
-    content: data.answer,
-    sources: data.sources || [],
-    metadata: data.metadata || null,
-    events: data.events || [],
-    services: data.services || [],
-  });
+  messages.push({ role: "user", content: text });
   loading = true;
   renderMessages();
 
@@ -332,6 +324,8 @@ async function sendMessage(text) {
       content: data.answer,
       sources: data.sources || [],
       metadata: data.metadata || null,
+      events: data.events || [],
+      services: data.services || [],
     });
     renderMessages();
   } catch (e) {
