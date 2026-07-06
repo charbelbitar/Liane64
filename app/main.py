@@ -583,19 +583,19 @@ def _rag_pipeline_impl(query: str, chat_history):
             "language": "francais", "niveau_langue": "ambigu",
             "role_detecte": "ambigu", "phase": "enfance",
             "urgence": "oui", "reponse": URGENCY_RESPONSE,
-        }
+        }, [], []
 
     if is_closing_message(query):
         farewell = "De rien, n'hésitez pas à revenir si vous avez d'autres questions. Bonne continuation ! 😊"
         _append_turn(chat_history, query, farewell)
-        return farewell, {}
+        return farewell, {}, [], []
 
     rewritten_query, query_emb = rewrite_query(query, chat_history)
 
     if rewritten_query == "__NEGATIVE__":
         reply = "Pas de problème ! N'hésitez pas si vous avez d'autres questions. 😊"
         _append_turn(chat_history, query, reply)
-        return reply, {}
+        return reply, {}, [], []
 
 
     # Retrieval (embeddings + several French-only mechanisms — stade keyword
@@ -638,7 +638,7 @@ def _rag_pipeline_impl(query: str, chat_history):
             answer = parsed.get("reponse", "")
             if answer and not is_refusal(answer):
                 _append_turn(chat_history, query, answer)
-                return answer, parsed
+                return answer, parsed, [], []
             print("[CACHE] Cached answer was a refusal or empty — retrying")
 
 
@@ -693,7 +693,7 @@ def _rag_pipeline_impl(query: str, chat_history):
                     "role_detecte": "ambigu", "phase": "ambigu",
                     "urgence": "non", "reponse": out,
                     "sources": []
-                }
+                }, [], []
  
         print("[RAG] No sufficiently relevant docs/events/services — returning refusal without LLM call")
         out = "Pas de ressources disponibles."
@@ -703,7 +703,7 @@ def _rag_pipeline_impl(query: str, chat_history):
             "role_detecte": "ambigu", "phase": "ambigu",
             "urgence": "non", "reponse": out,
             "sources": []
-        }
+        }, [], []
 
     # DEBUG: print retrieved chunks
     print(f"\n{'='*60}")
@@ -825,7 +825,7 @@ def _rag_pipeline_impl(query: str, chat_history):
         print(f"[PIPELINE] LLM call failed: {e}")
         out = "Le service est temporairement indisponible. Veuillez réessayer dans quelques instants."
         _append_turn(chat_history, query, out)
-        return out, {}
+        return out, {}, [], []
 
     parsed = parse_llm_response(raw)
     answer = parsed.get("reponse", raw)
@@ -872,7 +872,7 @@ def _rag_pipeline_impl(query: str, chat_history):
                 "urgence": parsed.get("urgence", "non"),
                 "reponse": out,
                 "sources": []
-            }
+            }, [], []
     else:
         print("[GROUNDING] No document context — skipping overlap check (events/services only answer)")
 
