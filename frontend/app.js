@@ -100,20 +100,42 @@ function renderMessages() {
       const p = document.createElement("p");
       p.textContent = msg.content;
       bubble.appendChild(p);
+    // } else {
+    //   // speak button — top right corner
+    //   bubble.appendChild(buildSpeakButton(msg.content, msg.metadata?.language));
+    //   // metadata badges
+    //   if (msg.metadata) bubble.appendChild(buildMetaBar(msg.metadata));
+    //   // markdown content
+    //   const contentDiv = document.createElement("div");
+    //   contentDiv.innerHTML = renderMarkdown(msg.content);
+    //   bubble.appendChild(contentDiv);
+    //   // per-bubble feedback button
+    //   bubble.appendChild(buildBubbleFeedbackBtn());
+    //   // sources
+    //   if (msg.sources && msg.sources.length > 0) bubble.appendChild(buildSources(msg.sources));
+    // }
+
     } else {
-      // speak button — top right corner
       bubble.appendChild(buildSpeakButton(msg.content, msg.metadata?.language));
-      // metadata badges
       if (msg.metadata) bubble.appendChild(buildMetaBar(msg.metadata));
-      // markdown content
       const contentDiv = document.createElement("div");
       contentDiv.innerHTML = renderMarkdown(msg.content);
       bubble.appendChild(contentDiv);
-      // per-bubble feedback button
+
+      // Event cards
+      if (msg.events && msg.events.length > 0) {
+        bubble.appendChild(buildEventCards(msg.events));
+      }
+      // Service cards
+      if (msg.services && msg.services.length > 0) {
+        bubble.appendChild(buildServiceCards(msg.services));
+      }
+
       bubble.appendChild(buildBubbleFeedbackBtn());
-      // sources
       if (msg.sources && msg.sources.length > 0) bubble.appendChild(buildSources(msg.sources));
     }
+
+
 
     row.appendChild(bubble);
     messagesEl.appendChild(row);
@@ -272,7 +294,15 @@ function buildSpeakButton(text, language) {
 
 // ── Networking ────────────────────────────────────────────────────────────
 async function sendMessage(text) {
-  messages.push({ role: "user", content: text });
+  // messages.push({ role: "user", content: text });
+  messages.push({
+    role: "assistant",
+    content: data.answer,
+    sources: data.sources || [],
+    metadata: data.metadata || null,
+    events: data.events || [],
+    services: data.services || [],
+  });
   loading = true;
   renderMessages();
 
@@ -414,6 +444,78 @@ function stopListening(btn) {
   btn.classList.remove("listening");
   btn.textContent = "🎤";
   recognition = null;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr + "T12:00:00");
+    return d.toLocaleDateString("fr-FR", {
+      weekday: "long", day: "numeric", month: "long", year: "numeric"
+    });
+  } catch (_) { return dateStr; }
+}
+
+function buildEventCards(events) {
+  const section = document.createElement("div");
+  section.className = "cards-section";
+
+  const title = document.createElement("p");
+  title.className = "cards-title";
+  title.textContent = "📅 Événements à proximité";
+  section.appendChild(title);
+
+  events.forEach((e) => {
+    const card = document.createElement("div");
+    card.className = "event-card";
+
+    let html = `<div class="card-name">${escapeHtml(e.nom || "Événement")}</div>`;
+    if (e.sujet) html += `<span class="card-tag">${escapeHtml(e.sujet)}</span>`;
+    if (e.date)  html += `<div class="card-row">📆 ${escapeHtml(formatDate(e.date))}</div>`;
+    if (e.adresse || e.ville) {
+      const loc = [e.adresse, e.ville].filter(Boolean).join(", ");
+      html += `<div class="card-row">📍 ${escapeHtml(loc)}</div>`;
+    }
+    if (e.lien_inscription) {
+      html += `<a href="${escapeHtml(e.lien_inscription)}" target="_blank" rel="noopener noreferrer" class="card-link">S'inscrire →</a>`;
+    }
+    card.innerHTML = html;
+    section.appendChild(card);
+  });
+
+  return section;
+}
+
+function buildServiceCards(services) {
+  const section = document.createElement("div");
+  section.className = "cards-section";
+
+  const title = document.createElement("p");
+  title.className = "cards-title";
+  title.textContent = "🛠️ Services disponibles";
+  section.appendChild(title);
+
+  services.forEach((s) => {
+    const card = document.createElement("div");
+    card.className = "service-card";
+
+    let html = `<div class="card-name">${escapeHtml(s.nom || "Service")}</div>`;
+    if (s.type_service) html += `<span class="card-tag">${escapeHtml(s.type_service)}</span>`;
+    if (s.adresse || s.ville) {
+      const loc = [s.adresse, s.ville].filter(Boolean).join(", ");
+      html += `<div class="card-row">📍 ${escapeHtml(loc)}</div>`;
+    }
+    if (s.telephone) {
+      html += `<div class="card-row">📞 <a href="tel:${escapeHtml(s.telephone)}">${escapeHtml(s.telephone)}</a></div>`;
+    }
+    if (s.email) {
+      html += `<div class="card-row">✉️ <a href="mailto:${escapeHtml(s.email)}">${escapeHtml(s.email)}</a></div>`;
+    }
+    card.innerHTML = html;
+    section.appendChild(card);
+  });
+
+  return section;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────

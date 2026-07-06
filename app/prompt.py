@@ -68,11 +68,16 @@ def build_prompt(query: str, documents: list[str], events: list = None, services
 
         services_section = "\n".join(lines)
 
-    # Assemble supplementary block
-    supplementary = ""
-    parts = [p for p in [events_section, services_section] if p]
-    if parts:
-        supplementary = "\n\n---\n" + "\n\n".join(parts)
+
+    hint = ""
+    if relevant_events or relevant_services:
+        parts = []
+        if events:
+            parts.append(f"{len(events)} événement(s) pertinent(s) disponible(s)")
+        if services:
+            parts.append(f"{len(services)} service(s) pertinent(s) disponible(s)")
+        hint = f"\n\n[SYSTÈME: {' et '.join(parts)} — affichés automatiquement par l'interface]"
+        
 
     prompt = f"""
 Tu es un assistant spécialisé pour :
@@ -117,11 +122,17 @@ Instructions de réponse (applicables uniquement si tu fournis une réponse comp
 - Si un parent a besoin de parler à quelqu'un, propose de contacter 'Le Fil des parents' (CAF64) au 05 59 46 78 85 ou via l'application Tipi
 - Ne fais JAMAIS de suppositions sur la situation personnelle de l'utilisateur (composition de la famille, âge des enfants, situation maritale, etc.). Base-toi UNIQUEMENT sur ce que l'utilisateur a explicitement mentionné dans sa question."
 
+
 Instructions pour les événements et services :
-- Si des événements ou services sont fournis ci-dessous, intègre-les dans ta réponse quand ils sont pertinents
-- Reproduis-les EXACTEMENT tels qu'ils apparaissent dans les sections "📅 Événements liés" et "🛠️ Services disponibles" à la fin du champ "reponse", sans les modifier ni en inventer d'autres
-- Si aucun événement ou service n'est fourni dans ce prompt, il est STRICTEMENT INTERDIT de mentionner ces sections ou d'écrire des phrases comme "Aucun événement disponible" ou "Aucun service listé". Omets-les complètement, comme si elles n'existaient pas. 
-- [INDICATEUR SYSTÈME] Localisation de l'utilisateur {"précisée" if location_known else "NON précisée"} dans la question. Si répondre nécessite de recommander un service, un mode de garde, un atelier ou un événement géographiquement situé (et non une ressource nationale comme une ligne d'écoute, un numéro d'urgence ou une plateforme en ligne), et que la localisation n'est pas précisée, demande D'ABORD à l'utilisateur sa ville ou son code postal avant de lui proposer une liste de services/événements — sauf si un seul résultat listé ci-dessous est suffisamment pertinent indépendamment de la localisation. Ne pose pas cette question si la question ne porte pas sur un service/événement localisé.
+- Si des événements ou services sont fournis ci-dessous, utilise-les pour contextualiser ta réponse 
+  (ex: "Il existe des ateliers sur ce sujet près de chez vous").
+- Ne reproduis PAS les sections "📅 Événements liés" et "🛠️ Services disponibles" dans le champ "reponse".
+  Ces sections sont affichées automatiquement par l'interface utilisateur.
+- Si aucun événement ou service n'est fourni, n'en mentionne pas l'existence.
+- [INDICATEUR SYSTÈME] Localisation de l'utilisateur {"précisée" if location_known else "NON précisée"} 
+  dans la question. Si répondre nécessite de recommander un service géographiquement situé et que la 
+  localisation n'est pas précisée, demande D'ABORD la ville ou le code postal.
+
 
 Références :
 - Le champ "sources" doit rester une liste vide [] — les sources seront ajoutées automatiquement.

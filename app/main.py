@@ -547,9 +547,17 @@ def _append_turn(chat_history: list, query: str, answer: str) -> None:
     chat_history.append({"role": "assistant", "content": answer})
 
 
+# def rag_pipeline(query: str, chat_history):
+#     with PIPELINE_TOTAL_DURATION.time():
+#         return _rag_pipeline_impl(query, chat_history)
+
+
 def rag_pipeline(query: str, chat_history):
     with PIPELINE_TOTAL_DURATION.time():
-        return _rag_pipeline_impl(query, chat_history)
+        result = _rag_pipeline_impl(query, chat_history)
+        return result  # now (answer, parsed, events, services)
+    
+    
 
 def _rag_pipeline_impl(query: str, chat_history):
 
@@ -888,7 +896,7 @@ def _rag_pipeline_impl(query: str, chat_history):
         ).start()
  
     _append_turn(chat_history, query, answer)
-    return answer, parsed
+    return answer, parsed, relevant_events, relevant_services
 
 
 

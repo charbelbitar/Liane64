@@ -65,7 +65,7 @@ def chat(req: ChatRequest):
         # Convert Pydantic messages to plain dicts that main.py expects
         history = [{"role": m.role, "content": m.content} for m in req.history]
 
-        answer, parsed = rag_pipeline(req.message, history)
+        answer, parsed, raw_events, raw_services = rag_pipeline(req.message, history)
 
         sources = parsed.get("sources", []) if parsed else []
 
@@ -79,7 +79,38 @@ def chat(req: ChatRequest):
                 niveau_langue=parsed.get("niveau_langue"),
             )
 
-        return ChatResponse(answer=answer, sources=sources, metadata=metadata)
+        events = []
+        for e in (raw_events or []):
+            m = e.get("metadata", {})
+            events.append(EventItem(
+                nom=m.get("nom_evenement"),
+                date=m.get("date_evenement"),
+                adresse=m.get("adresse"),
+                ville=m.get("ville"),
+                sujet=m.get("sujet"),
+                lien_inscription=m.get("lien_inscription") or None,
+            ))
+
+        services = []
+        for s in (raw_services or []):
+            m = s.get("metadata", {})
+            nom = m.get("nom") or m.get("qui") or m.get("structure_nom")
+            services.append(ServiceItem(
+                nom=nom,
+                type_service=m.get("type") or m.get("quoi"),
+                adresse=m.get("adresse"),
+                ville=m.get("ville"),
+                telephone=m.get("telephone"),
+                email=m.get("email") if m.get("email") and m.get("email") != "/" else None,
+            ))
+
+        return ChatResponse(
+            answer=answer,
+            sources=sources,
+            metadata=metadata,
+            events=events,
+            services=services,
+        )
 
     except Exception:
         raise HTTPException(status_code=500, detail=traceback.format_exc())
@@ -104,3 +135,27 @@ def feedback(req: FeedbackRequest):
     with open(FEEDBACK_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     return {"status": "ok"}
+
+
+class EventItem(BaseModel):
+    nom: Optional[str] = None
+    date: Optional[str] = None
+    adresse: Optional[str] = None
+    ville: Optional[str] = None
+    sujet: Optional[str] = None
+    lien_inscription: Optional[str] = None
+
+class ServiceItem(BaseModel):
+    nom: Optional[str] = None
+    type_service: Optional[str] = None
+    adresse: Optional[str] = None
+    ville: Optional[str] = None
+    telephone: Optional[str] = None
+    email: Optional[str] = None
+
+class ChatResponse(BaseModel):
+    answer: str
+    sources: List[str] = []
+    metadata: Optional[Metadata] = None
+    events: List[EventItem] = []
+    services: List[ServiceItem] = []
