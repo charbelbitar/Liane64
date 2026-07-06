@@ -70,7 +70,7 @@ def build_prompt(query: str, documents: list[str], events: list = None, services
 
 
     hint = ""
-    if relevant_events or relevant_services:
+    if events or services:
         parts = []
         if events:
             parts.append(f"{len(events)} événement(s) pertinent(s) disponible(s)")
