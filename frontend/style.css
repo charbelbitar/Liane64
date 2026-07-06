@@ -713,6 +713,17 @@ body.chat-layout {
 }
 .card-link:hover { opacity: 0.85; }
 
+.card-organizer {
+  font-style: italic;
+  color: #7880a0;
+}
+
+.card-public {
+  font-size: 0.78rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+
 
 
 /* ── Form modal (larger than review modal) ── */

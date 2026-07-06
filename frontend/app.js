@@ -464,15 +464,51 @@ function buildEventCards(events) {
     card.className = "event-card";
 
     let html = `<div class="card-name">${escapeHtml(e.nom || "Événement")}</div>`;
-    if (e.sujet) html += `<span class="card-tag">${escapeHtml(e.sujet)}</span>`;
-    if (e.date)  html += `<div class="card-row">📆 ${escapeHtml(formatDate(e.date))}</div>`;
+
+    // Subject tag
+    if (e.sujet) {
+      html += `<span class="card-tag">${escapeHtml(e.sujet)}</span>`;
+    }
+
+    // Organizer
+    if (e.structure_nom) {
+      html += `<div class="card-row card-organizer">🏢 ${escapeHtml(e.structure_nom)}</div>`;
+    }
+
+    // Date
+    if (e.date) {
+      html += `<div class="card-row">📆 ${escapeHtml(formatDate(e.date))}</div>`;
+    }
+
+    // Address — clickable Google Maps link
     if (e.adresse || e.ville) {
       const loc = [e.adresse, e.ville].filter(Boolean).join(", ");
-      html += `<div class="card-row">📍 ${escapeHtml(loc)}</div>`;
+      const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(loc)}`;
+      html += `<div class="card-row">📍 <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(loc)}</a></div>`;
     }
+
+    // Public / age targeting
+    const publicParts = [];
+    if (e.public_futurs_parents) publicParts.push("Futurs parents");
+    if (e.public_parents)        publicParts.push("Parents");
+    if (e.public_enfants) {
+      const min = e.public_age_minimum;
+      const max = e.public_age_maximum;
+      if (min !== null && min !== undefined && max !== null && max !== undefined) {
+        publicParts.push(`Enfants ${min}–${max} ans`);
+      } else {
+        publicParts.push("Enfants");
+      }
+    }
+    if (publicParts.length > 0) {
+      html += `<div class="card-row card-public">👥 ${escapeHtml(publicParts.join(" · "))}</div>`;
+    }
+
+    // Registration link
     if (e.lien_inscription) {
       html += `<a href="${escapeHtml(e.lien_inscription)}" target="_blank" rel="noopener noreferrer" class="card-link">S'inscrire →</a>`;
     }
+
     card.innerHTML = html;
     section.appendChild(card);
   });

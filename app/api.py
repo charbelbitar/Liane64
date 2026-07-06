@@ -55,6 +55,12 @@ class EventItem(BaseModel):
     ville: Optional[str] = None
     sujet: Optional[str] = None
     lien_inscription: Optional[str] = None
+    structure_nom: Optional[str] = None
+    public_enfants: Optional[bool] = None
+    public_age_minimum: Optional[int] = None
+    public_age_maximum: Optional[int] = None
+    public_parents: Optional[bool] = None
+    public_futurs_parents: Optional[bool] = None
 
 class ServiceItem(BaseModel):
     nom: Optional[str] = None
@@ -106,13 +112,19 @@ def chat(req: ChatRequest):
         for e in (raw_events or []):
             m = e.get("metadata", {})
             events.append(EventItem(
-                nom=m.get("nom_evenement"),
-                date=m.get("date_evenement"),
-                adresse=m.get("adresse"),
-                ville=m.get("ville"),
-                sujet=m.get("sujet"),
-                lien_inscription=m.get("lien_inscription") or None,
-            ))
+            nom=m.get("nom_evenement"),
+            date=m.get("date_evenement"),
+            adresse=m.get("adresse"),
+            ville=m.get("ville"),
+            sujet=m.get("sujet"),
+            lien_inscription=m.get("lien_inscription") or None,
+            structure_nom=m.get("structure_nom") or None,
+            public_enfants=m.get("public_enfants"),
+            public_age_minimum=m.get("public_age_minimum"),
+            public_age_maximum=m.get("public_age_maximum"),
+            public_parents=m.get("public_parents"),
+            public_futurs_parents=m.get("public_futurs_parents"),
+        ))
 
         services = []
         for s in (raw_services or []):
