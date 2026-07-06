@@ -48,10 +48,33 @@ class Metadata(BaseModel):
     language: Optional[str] = None
     niveau_langue: Optional[str] = None
 
+class EventItem(BaseModel):
+    nom: Optional[str] = None
+    date: Optional[str] = None
+    adresse: Optional[str] = None
+    ville: Optional[str] = None
+    sujet: Optional[str] = None
+    lien_inscription: Optional[str] = None
+
+class ServiceItem(BaseModel):
+    nom: Optional[str] = None
+    type_service: Optional[str] = None
+    adresse: Optional[str] = None
+    ville: Optional[str] = None
+    telephone: Optional[str] = None
+    email: Optional[str] = None
+
 class ChatResponse(BaseModel):
     answer: str
     sources: List[str] = []
     metadata: Optional[Metadata] = None
+    events: List[EventItem] = []
+    services: List[ServiceItem] = []
+
+class FeedbackRequest(BaseModel):
+    rating: int
+    mcq_answer: Optional[str] = None
+    message_count: Optional[int] = None
 
 
 @app.get("/health")
@@ -137,25 +160,3 @@ def feedback(req: FeedbackRequest):
     return {"status": "ok"}
 
 
-class EventItem(BaseModel):
-    nom: Optional[str] = None
-    date: Optional[str] = None
-    adresse: Optional[str] = None
-    ville: Optional[str] = None
-    sujet: Optional[str] = None
-    lien_inscription: Optional[str] = None
-
-class ServiceItem(BaseModel):
-    nom: Optional[str] = None
-    type_service: Optional[str] = None
-    adresse: Optional[str] = None
-    ville: Optional[str] = None
-    telephone: Optional[str] = None
-    email: Optional[str] = None
-
-class ChatResponse(BaseModel):
-    answer: str
-    sources: List[str] = []
-    metadata: Optional[Metadata] = None
-    events: List[EventItem] = []
-    services: List[ServiceItem] = []

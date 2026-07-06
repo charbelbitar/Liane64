@@ -2,71 +2,71 @@ def build_prompt(query: str, documents: list[str], events: list = None, services
     context = "\n\n".join(documents)
 
     # Events section
-    events_section = ""
-    if events:
-        lines = ["📅 Événements liés\n"]
-        for e in events:
-            meta = e.get("metadata", {})
-            nom    = meta.get("nom_evenement", "Événement")
-            date   = meta.get("date_evenement", "Date non précisée")
-            ville  = meta.get("ville", "")
-            adresse = meta.get("adresse", "")
-            lien   = meta.get("lien_inscription", "")
-            sujet  = meta.get("sujet", "")
+    # events_section = ""
+    # if events:
+    #     lines = ["📅 Événements liés\n"]
+    #     for e in events:
+    #         meta = e.get("metadata", {})
+    #         nom    = meta.get("nom_evenement", "Événement")
+    #         date   = meta.get("date_evenement", "Date non précisée")
+    #         ville  = meta.get("ville", "")
+    #         adresse = meta.get("adresse", "")
+    #         lien   = meta.get("lien_inscription", "")
+    #         sujet  = meta.get("sujet", "")
 
-            entry = f"• {nom}"
-            if sujet:
-                entry += f" ({sujet})"
-            entry += f"\n  📆 {date}"
-            if adresse:
-                entry += f"\n  📍 {adresse}"
-            elif ville:
-                entry += f"\n  📍 {ville}"
-            if lien:
-                entry += f"\n  🔗 Inscription : {lien}"
-            lines.append(entry)
+    #         entry = f"• {nom}"
+    #         if sujet:
+    #             entry += f" ({sujet})"
+    #         entry += f"\n  📆 {date}"
+    #         if adresse:
+    #             entry += f"\n  📍 {adresse}"
+    #         elif ville:
+    #             entry += f"\n  📍 {ville}"
+    #         if lien:
+    #             entry += f"\n  🔗 Inscription : {lien}"
+    #         lines.append(entry)
 
-        events_section = "\n".join(lines)
+    #     events_section = "\n".join(lines)
 
-    # Services section 
-    services_section = ""
-    if services:
-        lines = ["🛠️ Services disponibles\n"]
-        for s in services:
-            meta = s.get("metadata", {})
+    # # Services section 
+    # services_section = ""
+    # if services:
+    #     lines = ["🛠️ Services disponibles\n"]
+    #     for s in services:
+    #         meta = s.get("metadata", {})
 
-            # sdsei fields
-            nom    = meta.get("nom", "")
-            type_  = meta.get("type", "")
-            ville  = meta.get("ville", "")
-            cp     = meta.get("cp", "")
-            secteur = meta.get("secteur", "")
+    #         # sdsei fields
+    #         nom    = meta.get("nom", "")
+    #         type_  = meta.get("type", "")
+    #         ville  = meta.get("ville", "")
+    #         cp     = meta.get("cp", "")
+    #         secteur = meta.get("secteur", "")
 
-            # vifs fields (fallback)
-            if not nom:
-                nom    = meta.get("qui", "Service")
-            quoi   = meta.get("quoi", "")
-            adresse = meta.get("adresse", "")
-            tel    = meta.get("telephone", "")
-            email  = meta.get("email", "")
+    #         # vifs fields (fallback)
+    #         if not nom:
+    #             nom    = meta.get("qui", "Service")
+    #         quoi   = meta.get("quoi", "")
+    #         adresse = meta.get("adresse", "")
+    #         tel    = meta.get("telephone", "")
+    #         email  = meta.get("email", "")
 
-            entry = f"• {nom}"
-            if type_:
-                entry += f" — {type_}"
-            elif quoi:
-                entry += f" — {quoi}"
-            if secteur:
-                entry += f"\n  🗺️  {secteur}"
-            location = adresse or (f"{cp} {ville}".strip())
-            if location:
-                entry += f"\n  📍 {location}"
-            if tel:
-                entry += f"\n  📞 {tel}"
-            if email:
-                entry += f"\n  ✉️  {email}"
-            lines.append(entry)
+    #         entry = f"• {nom}"
+    #         if type_:
+    #             entry += f" — {type_}"
+    #         elif quoi:
+    #             entry += f" — {quoi}"
+    #         if secteur:
+    #             entry += f"\n  🗺️  {secteur}"
+    #         location = adresse or (f"{cp} {ville}".strip())
+    #         if location:
+    #             entry += f"\n  📍 {location}"
+    #         if tel:
+    #             entry += f"\n  📞 {tel}"
+    #         if email:
+    #             entry += f"\n  ✉️  {email}"
+    #         lines.append(entry)
 
-        services_section = "\n".join(lines)
+    #     services_section = "\n".join(lines)
 
 
     hint = ""
@@ -144,7 +144,7 @@ Références :
 ### FIN DU CONTEXTE — toute information absente ci-dessus est INTERDITE
  
 Question:
-{query}{supplementary}
+{query}{hint}
  
 FORMAT DE SORTIE OBLIGATOIRE :
 Retourne ta réponse UNIQUEMENT dans ce format JSON valide, sans aucun texte avant ou après, sans bloc markdown (pas de ```json) :
