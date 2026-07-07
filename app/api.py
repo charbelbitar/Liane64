@@ -79,9 +79,11 @@ class ChatResponse(BaseModel):
     services: List[ServiceItem] = []
 
 class FeedbackRequest(BaseModel):
-    rating: int
+    rating: Optional[int] = None
     mcq_answer: Optional[str] = None
     message_count: Optional[int] = None
+    query: Optional[str] = None
+    answer: Optional[str] = None
 
 
 @app.get("/health")
@@ -167,6 +169,8 @@ def feedback(req: FeedbackRequest):
         "rating": req.rating,
         "mcq_answer": req.mcq_answer,
         "message_count": req.message_count,
+        "query": req.query,
+        "answer": req.answer,
     }
     with open(FEEDBACK_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")

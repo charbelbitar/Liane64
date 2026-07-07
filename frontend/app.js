@@ -113,7 +113,13 @@ function renderMessages() {
         bubble.appendChild(buildServiceCards(msg.services));
       }
 
-      bubble.appendChild(buildBubbleFeedbackBtn());
+      const msgIndex = messages.indexOf(msg);
+      const precedingUserMsg = messages.slice(0, msgIndex).reverse().find(m => m.role === "user");
+      bubble.appendChild(buildBubbleFeedbackBtn(
+        precedingUserMsg ? precedingUserMsg.content : "",
+        msg.content
+      ));
+      
       if (msg.sources && msg.sources.length > 0) bubble.appendChild(buildSources(msg.sources));
     }
 
@@ -236,14 +242,30 @@ function stopSpeaking() {
   currentSpeakBtn  = null;
 }
 
-function buildBubbleFeedbackBtn() {
+function buildBubbleFeedbackBtn(userQuery = "", answerText = "") {
   const btn = document.createElement("button");
   btn.className = "bubble-feedback-btn";
-  btn.textContent = "💬 Évaluer cette réponse";
+  btn.textContent = "💬 Donner mon avis";
   btn.title = "Donner votre avis sur cette réponse";
-  btn.addEventListener("click", () => {
+
+  btn.addEventListener("click", async () => {
+    // Log the query/answer pair immediately on button click
+    try {
+      await fetch(`${API_BASE}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rating: null,
+          query: userQuery,
+          answer: answerText,
+          message_count: messages.length,
+        }),
+      });
+    } catch (_) {}
+
     feedbackOverlay.style.display = "flex";
   });
+
   return btn;
 }
 
