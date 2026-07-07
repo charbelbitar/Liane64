@@ -1,74 +1,6 @@
 def build_prompt(query: str, documents: list[str], events: list = None, services: list = None, location_known: bool = True):
     context = "\n\n".join(documents)
 
-    # Events section
-    # events_section = ""
-    # if events:
-    #     lines = ["📅 Événements liés\n"]
-    #     for e in events:
-    #         meta = e.get("metadata", {})
-    #         nom    = meta.get("nom_evenement", "Événement")
-    #         date   = meta.get("date_evenement", "Date non précisée")
-    #         ville  = meta.get("ville", "")
-    #         adresse = meta.get("adresse", "")
-    #         lien   = meta.get("lien_inscription", "")
-    #         sujet  = meta.get("sujet", "")
-
-    #         entry = f"• {nom}"
-    #         if sujet:
-    #             entry += f" ({sujet})"
-    #         entry += f"\n  📆 {date}"
-    #         if adresse:
-    #             entry += f"\n  📍 {adresse}"
-    #         elif ville:
-    #             entry += f"\n  📍 {ville}"
-    #         if lien:
-    #             entry += f"\n  🔗 Inscription : {lien}"
-    #         lines.append(entry)
-
-    #     events_section = "\n".join(lines)
-
-    # # Services section 
-    # services_section = ""
-    # if services:
-    #     lines = ["🛠️ Services disponibles\n"]
-    #     for s in services:
-    #         meta = s.get("metadata", {})
-
-    #         # sdsei fields
-    #         nom    = meta.get("nom", "")
-    #         type_  = meta.get("type", "")
-    #         ville  = meta.get("ville", "")
-    #         cp     = meta.get("cp", "")
-    #         secteur = meta.get("secteur", "")
-
-    #         # vifs fields (fallback)
-    #         if not nom:
-    #             nom    = meta.get("qui", "Service")
-    #         quoi   = meta.get("quoi", "")
-    #         adresse = meta.get("adresse", "")
-    #         tel    = meta.get("telephone", "")
-    #         email  = meta.get("email", "")
-
-    #         entry = f"• {nom}"
-    #         if type_:
-    #             entry += f" — {type_}"
-    #         elif quoi:
-    #             entry += f" — {quoi}"
-    #         if secteur:
-    #             entry += f"\n  🗺️  {secteur}"
-    #         location = adresse or (f"{cp} {ville}".strip())
-    #         if location:
-    #             entry += f"\n  📍 {location}"
-    #         if tel:
-    #             entry += f"\n  📞 {tel}"
-    #         if email:
-    #             entry += f"\n  ✉️  {email}"
-    #         lines.append(entry)
-
-    #     services_section = "\n".join(lines)
-
-
     hint = ""
     if events or services:
         parts = []
@@ -78,7 +10,6 @@ def build_prompt(query: str, documents: list[str], events: list = None, services
             parts.append(f"{len(services)} service(s) pertinent(s) disponible(s)")
         hint = f"\n\n[SYSTÈME: {' et '.join(parts)} — affichés automatiquement par l'interface]"
         
-
     prompt = f"""
 Tu es un assistant spécialisé pour :
 - les futurs parents
@@ -122,7 +53,6 @@ Instructions de réponse (applicables uniquement si tu fournis une réponse comp
 - Si un parent a besoin de parler à quelqu'un, propose de contacter 'Le Fil des parents' (CAF64) au 05 59 46 78 85 ou via l'application Tipi
 - Ne fais JAMAIS de suppositions sur la situation personnelle de l'utilisateur (composition de la famille, âge des enfants, situation maritale, etc.). Base-toi UNIQUEMENT sur ce que l'utilisateur a explicitement mentionné dans sa question."
 
-
 Instructions pour les événements et services :
 - Si des événements ou services sont fournis ci-dessous, utilise-les pour contextualiser ta réponse 
   (ex: "Il existe des ateliers sur ce sujet près de chez vous").
@@ -132,7 +62,6 @@ Instructions pour les événements et services :
 - [INDICATEUR SYSTÈME] Localisation de l'utilisateur {"précisée" if location_known else "NON précisée"} 
   dans la question. Si répondre nécessite de recommander un service géographiquement situé et que la 
   localisation n'est pas précisée, demande D'ABORD la ville ou le code postal.
-
 
 Références :
 - Le champ "sources" doit rester une liste vide [] — les sources seront ajoutées automatiquement.
@@ -149,7 +78,7 @@ Question:
 FORMAT DE SORTIE OBLIGATOIRE :
 Retourne ta réponse UNIQUEMENT dans ce format JSON valide, sans aucun texte avant ou après, sans bloc markdown (pas de ```json) :
 {{
-  "language": "francais" | "basque" | "occitan" | "anglais" | "espagnol",
+  "language": UNIQUEMENT l'une de ces valeurs exactes: "francais" ou "basque" ou "occitan" ou "anglais" ou "espagnol" — rien d'autre,
   "niveau_langue": "faible" | "moyen" | "avance" | "ambigu",
   "role_detecte": "parent" | "professionnel" | "ambigu",
   "phase": "grossesse" | "post-natalite" | "bebe" | "enfance" | "adolescence" | "ambigu",

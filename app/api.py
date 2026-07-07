@@ -9,11 +9,10 @@ import traceback
 from datetime import datetime, timezone
 import json
 import pathlib
-
 from main import rag_pipeline
 from cache import purge_invalid_entries
-
 from prometheus_fastapi_instrumentator import Instrumentator
+
 
 purge_invalid_entries()
 
@@ -29,8 +28,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+
+FEEDBACK_PATH = pathlib.Path("/app/feedback/feedback.jsonl")
+FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 class Message(BaseModel):
@@ -98,13 +99,19 @@ def chat(req: ChatRequest):
 
         sources = parsed.get("sources", []) if parsed else []
 
+        VALID_LANGUAGES = {"francais", "basque", "occitan", "anglais", "espagnol"}
+
         metadata = None
         if parsed:
+            language = parsed.get("language", "francais")
+            if language not in VALID_LANGUAGES:
+                print(f"[LANG] Invalid language value '{language}' — defaulting to 'francais'")
+                language = "francais"
             metadata = Metadata(
                 role_detecte=parsed.get("role_detecte"),
                 phase=parsed.get("phase"),
                 urgence=parsed.get("urgence"),
-                language=parsed.get("language"),
+                language=language,
                 niveau_langue=parsed.get("niveau_langue"),
             )
 
@@ -151,14 +158,6 @@ def chat(req: ChatRequest):
         raise HTTPException(status_code=500, detail=traceback.format_exc())
 
 
-FEEDBACK_PATH = pathlib.Path("/app/feedback/feedback.jsonl")
-FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-class FeedbackRequest(BaseModel):
-    rating: int
-    mcq_answer: Optional[str] = None
-    message_count: Optional[int] = None
-
 @app.post("/feedback")
 def feedback(req: FeedbackRequest):
     entry = {
@@ -170,5 +169,3 @@ def feedback(req: FeedbackRequest):
     with open(FEEDBACK_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     return {"status": "ok"}
-
-

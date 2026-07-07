@@ -13,7 +13,7 @@ cache_collection = chroma_client.get_or_create_collection(
     metadata={"hnsw:space": "cosine"}
 )
 
-SIMILARITY_THRESHOLD = 0.75
+SIMILARITY_THRESHOLD = 0.82
 EXACT_DUPLICATE_THRESHOLD = 0.97
 
 # A first-name gazetteer, lowercased, loaded once at import time.
