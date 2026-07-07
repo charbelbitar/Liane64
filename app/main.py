@@ -89,6 +89,40 @@ _SERVICE_OR_EVENT_INTENT_KEYWORDS = [
 ]
 
 
+_AGE_REQUIRED_KEYWORDS = [
+    "dort", "dodo", "sommeil", "mange", "alimentation", "repas", "diversification",
+    "développement", "apprentissage", "marche", "parle", "langage", "vaccin",
+    "taille", "poids", "croissance", "pleure", "dent", "allaitement", "biberon",
+    "écran", "autonomie", "propreté", "sevrage"
+]
+
+
+_LOCATION_REQUIRED_KEYWORDS = [
+    "atelier", "événement", "activité", "groupe", "rencontre", "sortie",
+    "service", "accompagnement", "soutien", "aide", "pmr", "crèche",
+    "relais", "rpe", "maison", "centre", "association"
+]
+
+
+def _needs_age_clarification(query: str, chat_history: list) -> bool:
+    q = query.lower()
+    age_pattern = re.compile(r'\b(\d+)\s*(?:semaine|mois|an)', re.IGNORECASE)
+    full_text = query + " ".join(m.get("content","") for m in chat_history)
+    if age_pattern.search(full_text):
+        return False
+    return any(kw in q for kw in _AGE_REQUIRED_KEYWORDS)
+
+
+def _needs_location_clarification(query: str, chat_history: list) -> bool:
+    q = query.lower()
+    full_text = query + " ".join(m.get("content","") for m in chat_history)
+    from retriever import detect_location
+    ville, cp = detect_location(full_text)
+    if ville or cp:
+        return False 
+    return any(kw in q for kw in _LOCATION_REQUIRED_KEYWORDS)
+
+
 def _has_service_or_event_intent(query: str) -> bool:
     q = query.lower()
     return any(kw in q for kw in _SERVICE_OR_EVENT_INTENT_KEYWORDS)
@@ -546,43 +580,78 @@ def _rag_pipeline_impl(query: str, chat_history):
         _append_turn(chat_history, query, farewell)
         return farewell, {}, [], []
 
-    rewritten_query, query_emb = rewrite_query(query, chat_history)
 
-    if rewritten_query == "__NEGATIVE__":
-        reply = "Pas de problème ! N'hésitez pas si vous avez d'autres questions. 😊"
-        _append_turn(chat_history, query, reply)
-        return reply, {}, [], []
+    # Clarification gates
+    needs_age = _needs_age_clarification(query, chat_history)
+    needs_loc = _needs_location_clarification(query, chat_history)
+
+    if needs_age:
+        clarification = (
+            "Pour vous donner une réponse précise et adaptée, "
+            "pourriez-vous me préciser l'âge de votre enfant "
+            "(en semaines, mois ou années) ?"
+        )
+        print(f"[CLARIFICATION] Age required for query: {query[:60]}")
+        _append_turn(chat_history, query, clarification)
+        return clarification, {
+            "language": "francais", "niveau_langue": "ambigu",
+            "role_detecte": "parent", "phase": "ambigu",
+            "urgence": "non", "reponse": clarification, "sources": []
+        }, [], []
+
+    if needs_loc:
+        clarification = (
+            "Pour vous proposer des événements et services près de chez vous, "
+            "pourriez-vous m'indiquer votre ville ou code postal ?"
+        )
+        print(f"[CLARIFICATION] Location required for query: {query[:60]}")
+        _append_turn(chat_history, query, clarification)
+        return clarification, {
+            "language": "francais", "niveau_langue": "ambigu",
+            "role_detecte": "parent", "phase": "ambigu",
+            "urgence": "non", "reponse": clarification, "sources": []
+        }, [], []
+
+    # Full pipeline
+    with PIPELINE_TOTAL_DURATION.time():
+
+        rewritten_query, query_emb = rewrite_query(query, chat_history)
+
+        if rewritten_query == "__NEGATIVE__":
+            reply = "Pas de problème ! N'hésitez pas si vous avez d'autres questions. 😊"
+            _append_turn(chat_history, query, reply)
+            return reply, {}, [], []
 
 
-    query_lang = _detect_query_language(rewritten_query)
-    if query_lang != "fr":
-        if rewritten_query == query and urgency_text != query:
-            retrieval_query = urgency_text
+        query_lang = _detect_query_language(rewritten_query)
+        if query_lang != "fr":
+            if rewritten_query == query and urgency_text != query:
+                retrieval_query = urgency_text
+            else:
+                print(f"[LANG] Non-French query detected (lang={query_lang}) — translating for retrieval/caching")
+                retrieval_query = translate_to_french(rewritten_query)
+            query_emb = None 
         else:
-            print(f"[LANG] Non-French query detected (lang={query_lang}) — translating for retrieval/caching")
-            retrieval_query = translate_to_french(rewritten_query)
-        query_emb = None 
-    else:
-        retrieval_query = rewritten_query
+            retrieval_query = rewritten_query
 
-    detected_ville, detected_cp = detect_location(retrieval_query)
+        detected_ville, detected_cp = detect_location(retrieval_query)
 
-    cached_answer = get_cached_answer(retrieval_query)
-    if cached_answer:
-        try:
-            parsed = json.loads(cached_answer)
-            if not isinstance(parsed, dict) or "reponse" not in parsed:
-                raise ValueError("Cached entry missing expected structure")
-        except (json.JSONDecodeError, TypeError, ValueError) as e:
-            print(f"[CACHE] Invalid or legacy entry, discarding: {e}")
-            parsed = None
+        cached_answer = get_cached_answer(retrieval_query)
+        if cached_answer:
+            try:
+                parsed = json.loads(cached_answer)
+                if not isinstance(parsed, dict) or "reponse" not in parsed:
+                    raise ValueError("Cached entry missing expected structure")
+            except (json.JSONDecodeError, TypeError, ValueError) as e:
+                print(f"[CACHE] Invalid or legacy entry, discarding: {e}")
+                parsed = None
 
-        if parsed:
-            answer = parsed.get("reponse", "")
-            if answer and not is_refusal(answer):
-                _append_turn(chat_history, query, answer)
-                return answer, parsed, [], []
-            print("[CACHE] Cached answer was a refusal or empty — retrying")
+            if parsed:
+                answer = parsed.get("reponse", "")
+                if answer and not is_refusal(answer):
+                    _append_turn(chat_history, query, answer)
+                    return answer, parsed, [], []
+                print("[CACHE] Cached answer was a refusal or empty — retrying")
 
 
     # Main document retrieval 
