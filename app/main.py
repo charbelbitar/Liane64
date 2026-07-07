@@ -7,7 +7,7 @@ import numpy as np
 from mistral_common.tokens.tokenizers.mistral import MistralTokenizer
 from mistral_common.protocol.instruct.messages import UserMessage
 from mistral_common.protocol.instruct.request import ChatCompletionRequest
-import json
+import pathlib, json
 import re
 import concurrent.futures
 import time        
@@ -19,6 +19,7 @@ from metrics import (
     GROUNDING_LLM_DURATION, RETRIEVAL_DURATION, PIPELINE_TOTAL_DURATION,
     GROUNDING_DISCARDED, GROUNDING_LLM_CHECK_CALLS,
 )
+from datetime import datetime, timezone
 
 
 _tokenizer = MistralTokenizer.v3()
@@ -874,6 +875,22 @@ def _rag_pipeline_impl(query: str, chat_history):
         ).start()
  
     _append_turn(chat_history, query, answer)
+
+    LOG_PATH = pathlib.Path("/app/feedback/conversation_log.jsonl")
+    try:
+        entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "query": query,
+            "answer": answer,
+            "language": parsed.get("language") if parsed else None,
+            "phase": parsed.get("phase") if parsed else None,
+            "urgence": parsed.get("urgence") if parsed else None,
+        }
+        with open(LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print(f"[LOG] Failed to write conversation log: {e}")
+
     return answer, parsed, relevant_events, relevant_services
 
 
