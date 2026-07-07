@@ -3,12 +3,9 @@ import sys
 import json
 import argparse
 from pathlib import Path
- 
 import chromadb
  
-# ---------------------------------------------------------------------------
 # Config
-# ---------------------------------------------------------------------------
 CHROMA_HOST = os.getenv("CHROMA_HOST", "chroma")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
 MAIN_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION", "MPJ_MPEDIA_PAPOTO_CAF_BGE")
@@ -16,12 +13,10 @@ EVENTS_COLLECTION_NAME = "events_caf64"
 SERVICES_COLLECTION_NAME = "servicess"
  
 DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
-BATCH_SIZE = 500  # upsert in chunks rather than one giant request
+BATCH_SIZE = 500
  
  
-# ---------------------------------------------------------------------------
 # JSONL loading
-# ---------------------------------------------------------------------------
 def load_jsonl(path: Path):
     if not path.exists():
         raise FileNotFoundError(f"Source file not found: {path}")
@@ -48,10 +43,6 @@ def find_one(dir_path: Path, pattern: str) -> Path:
  
  
 def sanitize_metadata(meta: dict, extra: dict | None = None) -> dict:
-    """Chroma metadata values must be str/int/float/bool (no lists/dicts/None).
-    Lists/dicts get JSON-encoded — this is exactly what main.py expects for
-    'mots_clés', since it does json.loads() on that field when building
-    chunk_meta_summary."""
     clean = {}
     for k, v in (meta or {}).items():
         if v is None:
@@ -90,9 +81,7 @@ def load_records(paths: list[Path]):
     return ids, docs, embeddings, metadatas
  
  
-# ---------------------------------------------------------------------------
 # Chroma client
-# ---------------------------------------------------------------------------
 def get_chroma_client() -> chromadb.HttpClient:
     return chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
  
@@ -103,7 +92,7 @@ def get_or_reset_collection(client, name: str, reset: bool):
             client.delete_collection(name=name)
             print(f"[RESET] deleted existing collection '{name}'")
         except Exception:
-            pass  # didn't exist yet — fine
+            pass 
     return client.get_or_create_collection(name=name)
  
  
@@ -123,9 +112,7 @@ def upsert_in_batches(collection, ids, docs, embeddings, metadatas, batch_size=B
         print(f"  upserted {min(i + batch_size, total)}/{total}")
  
  
-# ---------------------------------------------------------------------------
 # Per-collection ingestion
-# ---------------------------------------------------------------------------
 def ingest_main_kb(client, reset: bool):
     print(f"\n=== Ingesting main KB ({MAIN_COLLECTION_NAME}) ===")
     source_dirs = ["1000_premiers_jours", "mpedia", "papoto", "CAF64_articles"]
@@ -160,9 +147,7 @@ def ingest_services(client, reset: bool):
     print(f"'{SERVICES_COLLECTION_NAME}' now has {collection.count()} documents.")
  
  
-# ---------------------------------------------------------------------------
 # CLI
-# ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="Populate Chroma collections from pre-embedded JSONL files.")
     parser.add_argument(
@@ -181,7 +166,7 @@ def main():
     print(f"Connecting to Chroma at {CHROMA_HOST}:{CHROMA_PORT}")
     print(f"Reading source data from {DATA_DIR}")
     client = get_chroma_client()
-    client.heartbeat()  # fail fast with a clear error if chroma isn't reachable
+    client.heartbeat() 
  
     if args.collection in ("main", "all"):
         ingest_main_kb(client, args.reset)

@@ -16,11 +16,7 @@ cache_collection = chroma_client.get_or_create_collection(
 SIMILARITY_THRESHOLD = 0.82
 EXACT_DUPLICATE_THRESHOLD = 0.97
 
-# A first-name gazetteer, lowercased, loaded once at import time.
-# Source: INSEE's public "Liste de tous les prénoms" dataset (open data, not copyrighted —
-# it's a factual list of legal first names). Download once, store as prenoms_fr.csv
-# next to this file with one name per line.
-_PRENOMS_PATH = pathlib.Path(__file__).parent / "prenoms_fr.csv"
+_PRENOMS_PATH = pathlib.Path(__file__).parent / "prenoms_clean.csv"
 
 def _load_prenoms() -> frozenset[str]:
     if not _PRENOMS_PATH.exists():
@@ -30,8 +26,6 @@ def _load_prenoms() -> frozenset[str]:
 
 _KNOWN_PRENOMS = _load_prenoms()
 
-# Relaxed: name no longer needs to be capitalized — the relational/title
-# context word ("mon mari", "Dr.", etc.) is the real signal here.
 _NAME_PREFIX_RE = re.compile(
     r"""
     (?:
@@ -51,13 +45,11 @@ _NAME_PREFIX_RE = re.compile(
     re.VERBOSE | re.IGNORECASE,
 )
  
- # Bare full names with NO context: keep the capitalized pattern as one path...
 _FULL_NAME_RE = re.compile(
     r'\b([A-ZÀÂÉÈÊËÎÏÔÙÛÜ][a-zàâéèêëîïôùûü]{2,}'
     r'(?:\s+[A-ZÀÂÉÈÊËÎÏÔÙÛÜ][a-zàâéèêëîïôùûü]{2,})+)\b'
 )
  
-# Shared word pattern used by the gazetteer-based (lowercase) checks below.
 _WORD_RE = r"[a-zàâéèêëîïôùûü]+(?:-[a-zàâéèêëîïôùûü]+)*"
  
 _SIMPLE_PII = [
@@ -66,21 +58,13 @@ _SIMPLE_PII = [
     (re.compile(r'\b(?:né(?:e)?\s+(?:le|en)\s+)?\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b'), "[DATE]"),
 ]
  
-# If any of these remain after scrubbing, the query is still too identifying
 _RESIDUAL_PII_RE = re.compile(r'\[(?:NOM|TEL|EMAIL|DATE)\]')
  
-
-# Prénoms that are common nouns in everyday/medical French — excluded from the
-# standalone-token check to avoid over-redacting ordinary words.
-# (They're still caught by _NAME_PREFIX_RE and the pair-based check, where
-# context disambiguates them — e.g. "mon mari Pierre" still gets redacted.)
 _AMBIGUOUS_PRENOMS = frozenset({
     "pierre", "rose", "marguerite", "iris", "lys", "lou", "olive",
     "violette", "perle", "jade", "capucine", "églantine",
 })
 
-# Function words / short tokens that should never be treated as a name
-# even if they happen to coincide with a rare prénom.
 _MIN_STANDALONE_NAME_LEN = 3
 
 _STANDALONE_TOKEN_RE = re.compile(rf'\b({_WORD_RE})\b')
@@ -113,7 +97,7 @@ def scrub_pii(text: str) -> str:
  
     text = _NAME_PREFIX_RE.sub(_replace_named, text)
     text = _FULL_NAME_RE.sub("[NOM]", text)
-    text = _scrub_standalone_first_names(text)  # single token, e.g. "lucas pleure"
+    text = _scrub_standalone_first_names(text) 
  
     for pattern, placeholder in _SIMPLE_PII:
         text = pattern.sub(placeholder, text)
@@ -123,12 +107,9 @@ def scrub_pii(text: str) -> str:
  
 def has_residual_pii(text: str) -> bool:
     return bool(_RESIDUAL_PII_RE.search(text))
- 
- 
 
 
 def embed_query(query: str, verbose: bool = False) -> list:
-    # emb = embedding_model.encode(query).tolist()
     emb = embed(query)
     if verbose:
         arr = np.array(emb)
@@ -143,7 +124,6 @@ def get_cached_answer(query: str) -> str | None:
         print("[CACHE] Collection is empty, skipping lookup")
         return None
 
-    # query_emb = embed_query(query)
     scrubbed = scrub_pii(query)
     query_emb = embed_query(scrubbed)
  
@@ -197,7 +177,6 @@ def add_to_cache(query: str, answer: str) -> None:
  
     query_emb = embed_query(scrubbed)
  
-    # Skip near-duplicates
     if cache_collection.count() > 0:
         existing = cache_collection.query(
             query_embeddings=[query_emb],
@@ -234,7 +213,6 @@ def purge_invalid_entries() -> None:
         elif doc.strip().startswith("<html") or "Gateway Time-out" in doc:
             reason = "HTML error page"
         else:
-            # Check for legacy plain-text or non-standard JSON structure
             try:
                 inner = json.loads(doc)
                 if not isinstance(inner, dict) or "reponse" not in inner:

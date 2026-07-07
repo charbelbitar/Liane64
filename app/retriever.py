@@ -25,7 +25,7 @@ _RISQUE_WEIGHTS: dict[str, float] = {
 }
 
 STADE_BOOST   = 0.07   # added to score when stade matches the query
-KEYWORD_BOOST = 0.05   # added per matched mot-clé (capped at 1 match)
+KEYWORD_BOOST = 0.05   # added per matched mot-clé
 
 
 # Return the most likely stade based on keywords in the query or none
@@ -37,6 +37,7 @@ def _infer_stade_from_query(query: str) -> str | None:
         if count > best_count:
             best_count, best_stade = count, stade
     return best_stade if best_count > 0 else None
+
 
 # Returns a score bonus in [0, ~0.20] based on stade match, mots_clés overlap, risque level
 def _metadata_boost(meta: dict, query: str, inferred_stade: str | None) -> float:
@@ -56,7 +57,7 @@ def _metadata_boost(meta: dict, query: str, inferred_stade: str | None) -> float
     except Exception:
         keywords = []
     if any(kw.lower() in q_lower for kw in keywords):
-        boost += KEYWORD_BOOST   # capped at 1 match to avoid stacking
+        boost += KEYWORD_BOOST  
 
     # risque 
     risque = meta.get("risque", "faible").lower()
@@ -64,25 +65,15 @@ def _metadata_boost(meta: dict, query: str, inferred_stade: str | None) -> float
 
     return boost
 
-# The boost values (STADE_BOOST=0.07, KEYWORD_BOOST=0.05) are intentionally modest
-# They tip the balance between near-equal cosine scores without overriding semantic relevance
-
 
 def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
-# Geographic filtering for events/services
-# events_collection / services_collection both carry "ville" and "cp" in their metadata
-# A query like "un service social à Hendaye" could easily be outscored by a service in Pau with more semantically-similar wording, since embeddings aren't reliable at
-# distinguishing place names from general phrasing
-# We build the gazetteer directly from the live collections (rather than a static list) so it stays correct as data is added/changed
-
 GEO_BOOST = 0.15  # added when an item's ville/cp matches one detected in the query
 
 
 def _load_known_locations() -> tuple[dict[str, str], set[str]]:
-    # Returns ({lowercased_ville: original_casing_ville}, {known_cp_strings})
     villes_lower: dict[str, str] = {}
     cps: set[str] = set()
     for coll in (events_collection, services_collection):
@@ -111,17 +102,11 @@ def _build_ville_regex(villes_lower: dict[str, str]):
 
 _KNOWN_VILLES_LOWER, _KNOWN_CPS = _load_known_locations()
 
-# Longest-first so multi-word city names (like "Saint-Jean-de-Luz") aren't pre-empted by a shorter substring match
 _VILLE_RE = _build_ville_regex(_KNOWN_VILLES_LOWER)
 _CP_RE = re.compile(r'\b(\d{5})\b')
 
 
 def refresh_geo_gazetteer() -> None:
-    """Reload the ville/cp gazetteer from the live collections. The gazetteer
-    is built once at import time, so a new city/postal code added to
-    events_collection/services_collection after the process started wouldn't
-    be recognized by detect_location() until this is called (e.g. from your
-    data-ingestion script after loading new entries), or the process restarts."""
     global _KNOWN_VILLES_LOWER, _KNOWN_CPS, _VILLE_RE
     _KNOWN_VILLES_LOWER, _KNOWN_CPS = _load_known_locations()
     _VILLE_RE = _build_ville_regex(_KNOWN_VILLES_LOWER)
@@ -129,8 +114,6 @@ def refresh_geo_gazetteer() -> None:
 
 
 def detect_location(query: str) -> tuple[str | None, str | None]:
-    """Detect a known ville/cp mentioned in the query. Returns (ville, cp) in
-    their original stored casing/form, or (None, None) if nothing matched."""
     ville_match = None
     if _VILLE_RE:
         m = _VILLE_RE.search(query)
@@ -169,10 +152,9 @@ def _run_geo_query(coll, query_emb: list, n_results: int, where: dict | None):
 def retrieve_and_rerank(query: str, n_results=15, candidate_count=50, metadata_filter: dict = None, query_emb: list = None):
     
     if query_emb is None:
-        # query_emb = embedding_model.encode(query).tolist()
         query_emb = embed(query)
     elif not isinstance(query_emb, list):
-        query_emb = query_emb.tolist()  # handle numpy array passed from main.py
+        query_emb = query_emb.tolist() 
 
     query_kwargs = dict(
         query_embeddings=[query_emb],
@@ -185,16 +167,12 @@ def retrieve_and_rerank(query: str, n_results=15, candidate_count=50, metadata_f
     try:
         results = collection.query(**query_kwargs)
     except Exception as e:
-        # retrieve_events/retrieve_services both degrade gracefully on a query
-        # error (return []) — this didn't, so a transient main-collection DB
-        # issue would crash the whole pipeline instead of falling back to
-        # "no docs found" and still checking events/services.
         print(f"[RERANK] Query error: {e}")
         return []
  
-    docs       = results["documents"][0]       # list[str]
-    embeddings = results["embeddings"][0]      # list[list[float]]
-    metadatas  = results["metadatas"][0]       # list[dict]
+    docs       = results["documents"][0]    
+    embeddings = results["embeddings"][0]     
+    metadatas  = results["metadatas"][0]       
  
     if not docs:
         return []
@@ -224,13 +202,11 @@ def retrieve_and_rerank(query: str, n_results=15, candidate_count=50, metadata_f
  
  
 def _is_upcoming(meta: dict) -> bool:
-    """Returns True if date_evenement is missing/unparseable (fail open — better
-    to show an event with a malformed date than silently drop it) or today/future."""
     raw_date = (meta.get("date_evenement") or "").strip()
     if not raw_date:
         return True
     try:
-        event_date = date.fromisoformat(raw_date[:10])  # tolerate trailing time component
+        event_date = date.fromisoformat(raw_date[:10])
     except ValueError:
         return True
     return event_date >= date.today()
@@ -238,7 +214,6 @@ def _is_upcoming(meta: dict) -> bool:
 
 def retrieve_events(query: str, n_results=3, score_threshold=0.50, query_emb: list = None):
     if query_emb is None:
-        # query_emb = embedding_model.encode(query).tolist()
         query_emb = embed(query)
     elif not isinstance(query_emb, list):
         query_emb = query_emb.tolist()
@@ -251,8 +226,6 @@ def retrieve_events(query: str, n_results=3, score_threshold=0.50, query_emb: li
     try:
         results = _run_geo_query(events_collection, query_emb, min(n_results * 6, 25), where)
         if where and not results["documents"][0]:
-            # No event matches that exact ville/cp — fall back to unfiltered
-            # search with a soft boost instead, rather than returning nothing.
             print(f"[EVENTS] No events for location filter {where} — falling back to soft boost")
             results = _run_geo_query(events_collection, query_emb, min(n_results * 6, 25), None)
             where = None
@@ -267,9 +240,6 @@ def retrieve_events(query: str, n_results=3, score_threshold=0.50, query_emb: li
     if not docs:
         return []
 
-    # Drop past events before scoring — date_evenement was never checked
-    # before, so an event whose date had already passed could still be
-    # recommended to a user indefinitely.
     upcoming = [
         (doc, emb, meta) for doc, emb, meta in zip(docs, embeddings, metadatas)
         if _is_upcoming(meta)
@@ -308,7 +278,6 @@ def retrieve_events(query: str, n_results=3, score_threshold=0.50, query_emb: li
  
 def retrieve_services(query: str, n_results=3, score_threshold=0.45, query_emb: list = None):
     if query_emb is None:
-        # query_emb = embedding_model.encode(query).tolist()
         query_emb = embed(query)
     elif not isinstance(query_emb, list):
         query_emb = query_emb.tolist()

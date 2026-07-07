@@ -11,7 +11,7 @@ GROUNDING_LLM_CHECK_CALLS = Counter(
 CACHE_HITS = Counter("rag_cache_hits_total", "Semantic cache hits")
 CACHE_MISSES = Counter("rag_cache_misses_total", "Semantic cache misses")
 
-# ── Pipeline stage timing ──────────────────────────────────────────────
+# Pipeline stage timing
 EMBED_DURATION = Histogram(
     "rag_embed_duration_seconds",
     "Time spent calling the embeddings (TEI) service per request"

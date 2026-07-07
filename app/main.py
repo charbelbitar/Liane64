@@ -35,8 +35,8 @@ def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
-FOLLOWUP_THRESHOLD_HIGH = 0.75  # followup → rewrite directly
-FOLLOWUP_THRESHOLD_LOW  = 0.40  # new topic → skip entirely
+FOLLOWUP_THRESHOLD_HIGH = 0.75  # followup → rewrite the query directly
+FOLLOWUP_THRESHOLD_LOW  = 0.40  # new topic → skip rewriting
 
 
 URGENCY_KEYWORDS = [
@@ -78,7 +78,6 @@ VIOLENCE_TARGETS = re.compile(
 )
 
 
-# Lexical gate for the location-ask fallback: a query has to actually express service/event-seeking intent before a loose embedding match is trusted — see the call site in rag_pipeline() for why.
 _SERVICE_OR_EVENT_INTENT_KEYWORDS = [
     "service", "aide", "accompagnement", "mode de garde", "garde", "crèche", "creche",
     "assistante sociale", "pmi", "sage-femme", "sage femme", "pédiatre", "pediatre",
@@ -133,11 +132,6 @@ _EXPANDED_FALSE_POSITIVES = [
     for fp in URGENCY_FALSE_POSITIVES
     for variant in _expand_false_positive(fp)
 ]
-
-# without this, urgency_false_detection becomes a linear scan, it should not be
-# The list has ~50+ long phrases checked with if fp in q on every query
-# This is O(n·m) on every request. 
-# Convert to a compiled regex alternation once at module load
 
 _FP_RE = re.compile(
     "|".join(re.escape(fp) for fp in _EXPANDED_FALSE_POSITIVES),
@@ -236,11 +230,6 @@ def _llm(messages: list, temperature: float = 0, max_retries: int = 3, max_token
 
 
 def _detect_query_language(text: str) -> str:
-    """Best-effort language code for a query. Defaults to 'fr' on short or
-    ambiguous text — language detection is unreliable below a few words
-    (e.g. 'ok merci' can misdetect as Hungarian), and a wrong non-French
-    guess would trigger an unnecessary translation round-trip for what is
-    almost always French traffic anyway."""
     if len(text.split()) < 3:
         return "fr"
     try:
@@ -250,14 +239,10 @@ def _detect_query_language(text: str) -> str:
     except Exception as e:
         print(f"[LANG] Detection failed, defaulting to fr: {e}")
     return "fr"
- 
- 
+
+
+# Translate a non-French query to French for retrieval/caching ONLY
 def translate_to_french(query: str) -> str:
-    """Translate a non-French query to French for retrieval/caching ONLY.
-    Several mechanisms downstream are French-only by construction: the embedding model performs best comparing same-language text, the stade
-    keyword inference in retriever.py checks French words, and cache.py's PII-scrubbing context patterns ("mon mari", "ma femme"...) only match
-    French phrasing. None of those fire correctly on a raw English/Spanish query. The ORIGINAL query is still what's shown to the LLM for the
-    actual answer — this translation never reaches the user."""
     system_msg = {
         "role": "system",
         "content": (
@@ -295,8 +280,6 @@ def rewrite_query(query, chat_history) -> tuple[str, list | None]:
         print(f"[SHORT QUERY] '{query}' — rewriting from history")
         return _do_rewrite(query, history_text, last_assistant=last_assistant), None
 
-    # query_emb   = embedding_model.encode(query)
-    # history_emb = embedding_model.encode(history_text)
     query_emb   = embed(query)
     history_emb = embed(history_text)
     score = cosine_similarity(query_emb, history_emb)
@@ -304,7 +287,7 @@ def rewrite_query(query, chat_history) -> tuple[str, list | None]:
 
     if score < FOLLOWUP_THRESHOLD_LOW:
         print("[TOPIC SHIFT] new topic detected, skipping rewrite")
-        return query, query_emb  # embedding still valid, reuse it
+        return query, query_emb 
 
     if score > FOLLOWUP_THRESHOLD_HIGH:
         last_assistant = next(
@@ -325,16 +308,16 @@ def rewrite_query(query, chat_history) -> tuple[str, list | None]:
             content = _llm([{"role": "user", "content": prompt}])
     except RuntimeError as e:
         print(f"[REWRITE] Ambiguous-topic check failed, treating as same topic: {e}")
-        content = "OUI"  # fail toward rewriting, the safer default given the alternative is silently skipping context
+        content = "OUI" 
 
     if not content.strip().upper().startswith("OUI"):
-        return query, query_emb  # same query, embedding valid
+        return query, query_emb
 
     last_assistant = next(
         (m["content"] for m in reversed(chat_history) if m["role"] == "assistant"),
         ""
     )
-    return _do_rewrite(query, history_text, last_assistant=last_assistant), None # rewritten → embedding stale
+    return _do_rewrite(query, history_text, last_assistant=last_assistant), None
 
     
 def _do_rewrite(query: str, history_text: str, last_assistant: str = "") -> str:
@@ -363,9 +346,6 @@ def _do_rewrite(query: str, history_text: str, last_assistant: str = "") -> str:
 
 
 def _extract_reponse_field(raw: str) -> str | None:
-    """Best-effort extraction of the 'reponse' value when the JSON is
-    truncated or otherwise unparseable, so the user sees clean text
-    instead of a raw JSON dump."""
     match = re.search(r'"reponse"\s*:\s*"(.*)', raw, re.DOTALL)
     if not match:
         return None
@@ -383,8 +363,6 @@ def parse_llm_response(raw: str) -> dict:
     cleaned = re.sub(r"\s*```$", "", cleaned).strip()
  
     try:
-        # strict=False: some models (e.g. this Mistral variant) emit literal newlines inside string values instead of escaping them as \n.
-        # Strict JSON forbids raw control characters in strings, which made every multi-paragraph/bulleted answer fail to parse and fall through to the raw-text fallback below.
         parsed = json.loads(cleaned, strict=False)
         if is_refusal(parsed.get("reponse", "")):
             parsed.update({
@@ -397,7 +375,6 @@ def parse_llm_response(raw: str) -> dict:
             })
         return parsed
     except json.JSONDecodeError:
-        # Try extracting JSON block from somewhere inside the response
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if match:
             try:
@@ -510,8 +487,6 @@ def _strip_boilerplate(text: str) -> str:
 
 
 def _compute_overlap(answer: str, context_docs: list[str]) -> float:
-    """Fraction of the answer's substantive words that actually appear
-    somewhere in the retrieved context. Used as a cheap grounding signal."""
     context_text = " ".join(context_docs).lower()
     context_words = set(re.findall(r"\w{4,}", context_text))
     answer_words_list = re.findall(r"\w{4,}", _strip_boilerplate(answer).lower())
@@ -522,8 +497,6 @@ def _compute_overlap(answer: str, context_docs: list[str]) -> float:
 
 
 def llm_grounding_check(answer: str, context_docs: list[str]) -> bool:
-    """Second-opinion check, used only when the cheap heuristic is ambiguous.
-    Returns True if grounded, False if the answer contains unsupported claims."""
     context_text = "\n\n".join(context_docs)[:6000]
     prompt = (
         "Voici un CONTEXTE et une RÉPONSE générée à partir de ce contexte.\n"
@@ -546,31 +519,14 @@ def _append_turn(chat_history: list, query: str, answer: str) -> None:
     chat_history.append({"role": "user",      "content": query})
     chat_history.append({"role": "assistant", "content": answer})
 
-
-# def rag_pipeline(query: str, chat_history):
-#     with PIPELINE_TOTAL_DURATION.time():
-#         return _rag_pipeline_impl(query, chat_history)
-
-
 def rag_pipeline(query: str, chat_history):
     with PIPELINE_TOTAL_DURATION.time():
         result = _rag_pipeline_impl(query, chat_history)
-        return result  # now (answer, parsed, events, services)
+        return result 
     
-    
-
 def _rag_pipeline_impl(query: str, chat_history):
 
-    # Urgency detection must work regardless of input language. Every
-    # keyword/regex inside detect_urgency() (URGENCY_KEYWORDS, action verbs,
-    # violence targets) is French — a disclosure like "he hits the baby"
-    # would silently never trigger the emergency response if we only ever
-    # checked the raw query. _detect_query_language is a fast local check
-    # (no API call), so French queries — the large majority — pay zero
-    # extra cost; only non-French queries pay one translation call, which is
-    # a deliberate latency-for-safety tradeoff given what this check guards.
-    # We check BOTH the original and translated text, since translation
-    # could occasionally lose a safety-critical nuance.
+    # Urgency detection must work regardless of input language
     urgency_text = query
     query_lang_for_urgency = _detect_query_language(query)
     if query_lang_for_urgency != "fr":
@@ -598,36 +554,23 @@ def _rag_pipeline_impl(query: str, chat_history):
         return reply, {}, [], []
 
 
-    # Retrieval (embeddings + several French-only mechanisms — stade keyword
-    # inference in retriever.py, PII-scrubbing context patterns in cache.py)
-    # is unreliable on non-French queries: the embedding model performs best
-    # comparing same-language text, and keyword-based boosts/scrubbing simply
-    # never match non-French wording. We translate ONLY for retrieval/caching
-    # purposes — `rewritten_query` (the user's own language) is still what
-    # gets shown to the LLM for generation, so the final answer comes back
-    # naturally in the user's language without a separate translate-back step.
     query_lang = _detect_query_language(rewritten_query)
     if query_lang != "fr":
         if rewritten_query == query and urgency_text != query:
-            # Same text already translated above for the urgency check — reuse it
-            # instead of paying for an identical translation call twice.
             retrieval_query = urgency_text
         else:
             print(f"[LANG] Non-French query detected (lang={query_lang}) — translating for retrieval/caching")
             retrieval_query = translate_to_french(rewritten_query)
-        query_emb = None  # any cached embedding was computed on the non-French text — discard, recompute below
+        query_emb = None 
     else:
         retrieval_query = rewritten_query
 
-
-    # Detected early (cheap regex, no embedding call) since it's needed both for the relaxed-threshold check below and later for build_prompt
     detected_ville, detected_cp = detect_location(retrieval_query)
 
     cached_answer = get_cached_answer(retrieval_query)
     if cached_answer:
         try:
             parsed = json.loads(cached_answer)
-            # Validate it's a real RAG response, not a legacy plain-text entry
             if not isinstance(parsed, dict) or "reponse" not in parsed:
                 raise ValueError("Cached entry missing expected structure")
         except (json.JSONDecodeError, TypeError, ValueError) as e:
@@ -642,13 +585,9 @@ def _rag_pipeline_impl(query: str, chat_history):
             print("[CACHE] Cached answer was a refusal or empty — retrying")
 
 
-    # Main document retrieval — run alongside events/services so a weak match in the main KB never prevents events/services from being checked at all
+    # Main document retrieval 
     print("[PIPELINE] Retrieving documents, events & services concurrently...")
-    # Compute the embedding once and share it — retrieve_events/retrieve_services
-    # used to each independently call embedding_model.encode() on this same
-    # text, redundantly recomputing an identical vector twice per request.
     if query_emb is None:
-        # retrieval_query_emb = embedding_model.encode(retrieval_query).tolist()
         retrieval_query_emb = embed(retrieval_query)
     else:
         retrieval_query_emb = query_emb if isinstance(query_emb, list) else query_emb.tolist()
@@ -667,18 +606,8 @@ def _rag_pipeline_impl(query: str, chat_history):
     print(f"[RERANK] Scores before filtering: {[round(d.get('score', 0), 3) for d in ranked_docs]}")
     ranked_docs = [d for d in ranked_docs if d.get("score", 0) >= MIN_RERANK_SCORE]
 
-    # Only refuse outright if NOTHING relevant was found anywhere — main KB,
-    # events, or services. Previously this short-circuited on ranked_docs alone,
-    # which meant events/services were never consulted on a lot of queries.
+    # Only refuse outright if NOTHING relevant was found anywhere 
     if not ranked_docs and not relevant_events and not relevant_services:
-        # A generic, lay-phrased need ("un service pour mon bébé") can score
-        # below threshold purely because there's no city/cp to anchor the
-        # embedding to — not because nothing relevant exists. If no location
-        # was given, check loosely (lower threshold) before refusing outright;
-        # if something plausible turns up, ask for the location instead of
-        # declaring there's nothing available. This has to happen here, before
-        # the hardcoded return below — the LLM (and the prompt's own
-        # location-clarification instruction) is never reached on this path.
         if not (detected_ville or detected_cp) and _has_service_or_event_intent(retrieval_query):
             LOOSE_FLOOR = 0.35
             loose_events   = retrieve_events(retrieval_query, n_results=1, score_threshold=LOOSE_FLOOR, query_emb=retrieval_query_emb)
@@ -756,7 +685,6 @@ def _rag_pipeline_impl(query: str, chat_history):
                     truncated.rfind("?"),
                 )
                 if last_period != -1 and last_period > len(truncated) * 0.5:
-                    # Only cut at sentence boundary if it's in the latter half (avoids cutting too aggressively on short chunks)
                     truncated = truncated[: last_period + 1]
 
                 context_parts.append(truncated + " […]")
@@ -793,9 +721,6 @@ def _rag_pipeline_impl(query: str, chat_history):
                 "mots_clés": keywords,
             })
     
-    
-    # events & services were already retrieved concurrently with the main docs, above
-    # detected_ville/detected_cp were already computed earlier, right after rewrite_query)
     prompt = build_prompt(
         rewritten_query,
         context_parts,
@@ -830,9 +755,6 @@ def _rag_pipeline_impl(query: str, chat_history):
     parsed = parse_llm_response(raw)
     answer = parsed.get("reponse", raw)
 
-    # Sources/chunk_meta should reflect what the answer actually drew on, not everything that was merely retrieved. If the LLM decided the context
-    # wasn't sufficient (or refused), there's nothing to cite — attaching real_sources here regardless of the answer is what produced the
-    # contradictory "Pas de ressources disponibles." + 15 sources bug.
     NO_RESOURCE_SENTINELS = {"Pas de ressources disponibles.", "Cette question est hors périmètre."}
     if answer.strip() in NO_RESOURCE_SENTINELS or is_refusal(answer):
         parsed["sources"] = []
@@ -841,9 +763,7 @@ def _rag_pipeline_impl(query: str, chat_history):
         parsed["sources"] = real_sources
         parsed["chunk_meta"] = chunk_meta_summary
  
-    # Grounding check — catch answers longer than context could support
-    # Events/services text is verbatim from their own collections, not context_parts — count it as legitimate "grounded" content so an events/services-only answer
-    # (possible now that retrieval isn't gated behind the main-KB filter) isn't wrongly flagged as hallucinated.
+    # Grounding check 
     extra_words = sum(len(e.get("text", "").split()) for e in (relevant_events or []))
     extra_words += sum(len(s.get("text", "").split()) for s in (relevant_services or []))
  
@@ -876,19 +796,8 @@ def _rag_pipeline_impl(query: str, chat_history):
     else:
         print("[GROUNDING] No document context — skipping overlap check (events/services only answer)")
 
-    # Don't cache answers built from events — they're tied to a specific date
-    # and the cache has no expiry mechanism, so a cached answer recommending
-    # "l'atelier du 8 juillet" would keep being served from cache long after
-    # that date has passed. Services are less acutely time-sensitive (no
-    # expiry date), but their address/phone/hours can still change, so we
-    # exclude them too rather than risk serving stale contact details
-    # indefinitely from a cache with no TTL.
+    
     if is_valid_answer(answer) and not is_refusal(answer) and not relevant_events and not relevant_services:
-        # Fire-and-forget: caching (embedding + duplicate-check query + write)
-        # has no bearing on what the user sees, so it shouldn't add latency
-        # to the response. Failures are already handled internally by
-        # add_to_cache via prints, not exceptions, so nothing meaningful is
-        # lost by not waiting on this thread.
         threading.Thread(
             target=add_to_cache,
             args=(retrieval_query, json.dumps(parsed, ensure_ascii=False)),
@@ -919,34 +828,3 @@ if __name__ == "__main__":
                 print("\nRéponse :\n", answer)
         except Exception as e:
             print(f"\n[ERREUR] Une erreur inattendue s'est produite : {e}")
-
-
-
-
-# PIPELINE
-#     detect_urgency (checked against original + French-translated text)
-#     → is_closing
-#     → rewrite_query
-#     → language detection + translation (retrieval/caching only — generation
-#       always uses the original-language query)
-#     → cache check
-#     → retrieve_and_rerank + retrieve_events + retrieve_services
-#       (concurrent, share one embedding — NOT gated behind each other passing
-#       any threshold; only refuses outright if all three find nothing)
-#     → relaxed-threshold "ask for location" fallback (lexical intent gate +
-#       loose embedding match) if no location given and nothing crossed the
-#       normal threshold
-#     → build context_parts (token-budgeted)
-#     → build_prompt
-#     → LLM (max_tokens safety net)
-#     → parse (tolerant of unescaped control chars)
-#     → grounding check
-#     → cache (async, skipped for event/service-backed answers — no TTL exists,
-#       and those are date/contact-sensitive)
-#     → return
-
-# embedding reuse across all 3 concurrent retrieval calls
-# token budgeting
-# JSON-only caching
-# PII scrubbing before caching
-# geo gazetteer + event-date filtering (retriever.py)

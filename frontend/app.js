@@ -3,7 +3,6 @@ const API_BASE = "/api";
 let messages = [];
 let loading  = false;
 
-// ── DOM refs ──────────────────────────────────────────────────────────────
 const chatArea       = document.getElementById("chatArea");
 const emptyState     = document.getElementById("emptyState");
 const messagesEl     = document.getElementById("messages");
@@ -15,7 +14,6 @@ const feedbackBtn    = document.getElementById("feedbackBtn");
 const feedbackOverlay = document.getElementById("feedbackOverlay");
 const feedbackClose  = document.getElementById("feedbackClose");
 
-// ── Label maps ────────────────────────────────────────────────────────────
 const ROLE_LABELS = {
   parent:        "👨‍👩‍👧 Parent",
   professionnel: "🏥 Professionnel",
@@ -30,7 +28,6 @@ const PHASE_LABELS = {
   ambigu:          "❓ Indéterminé",
 };
 
-// ── Markdown renderer ─────────────────────────────────────────────────────
 function renderMarkdown(text) {
   let html = escapeHtml(text);
   html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code}</code></pre>`);
@@ -38,7 +35,7 @@ function renderMarkdown(text) {
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
 
-  // hyperlink detection (urls))
+  // Hyperlink detection (urls))
   html = html.replace(
     /(https?:\/\/[^\s<>"')\]]+)/g,
     '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
@@ -67,13 +64,13 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ── Input state ───────────────────────────────────────────────────────────
+// Input state management
 function updateInputState() {
   inputField.disabled = loading;
   sendBtn.disabled = loading || inputField.value.trim() === "";
 }
 
-// ── Rendering ─────────────────────────────────────────────────────────────
+// Rendering the chat messages
 function renderMessages() {
   updateInputState();
 
@@ -100,21 +97,6 @@ function renderMessages() {
       const p = document.createElement("p");
       p.textContent = msg.content;
       bubble.appendChild(p);
-    // } else {
-    //   // speak button — top right corner
-    //   bubble.appendChild(buildSpeakButton(msg.content, msg.metadata?.language));
-    //   // metadata badges
-    //   if (msg.metadata) bubble.appendChild(buildMetaBar(msg.metadata));
-    //   // markdown content
-    //   const contentDiv = document.createElement("div");
-    //   contentDiv.innerHTML = renderMarkdown(msg.content);
-    //   bubble.appendChild(contentDiv);
-    //   // per-bubble feedback button
-    //   bubble.appendChild(buildBubbleFeedbackBtn());
-    //   // sources
-    //   if (msg.sources && msg.sources.length > 0) bubble.appendChild(buildSources(msg.sources));
-    // }
-
     } else {
       bubble.appendChild(buildSpeakButton(msg.content, msg.metadata?.language));
       if (msg.metadata) bubble.appendChild(buildMetaBar(msg.metadata));
@@ -134,8 +116,6 @@ function renderMessages() {
       bubble.appendChild(buildBubbleFeedbackBtn());
       if (msg.sources && msg.sources.length > 0) bubble.appendChild(buildSources(msg.sources));
     }
-
-
 
     row.appendChild(bubble);
     messagesEl.appendChild(row);
@@ -209,12 +189,19 @@ function buildTypingIndicator() {
 function showError(message) {
   const banner = document.createElement("div");
   banner.className = "error-banner";
-  banner.innerHTML = `<strong>Erreur :</strong> ${escapeHtml(message)}`;
+  // Error to user
+  banner.innerHTML = `
+    <strong>Une erreur est survenue.</strong>
+    Veuillez réessayer dans quelques instants.
+    Si le problème persiste, actualisez la page.
+  `;
+  // Error to logs
+  console.error("[Chat error]", message);
   messagesEl.appendChild(banner);
   chatArea.scrollTop = chatArea.scrollHeight;
 }
 
-// ── Text-to-speech ────────────────────────────────────────────────────────
+// Text-to-speech
 let currentUtterance = null;
 let currentSpeakBtn  = null;
 
@@ -292,7 +279,7 @@ function buildSpeakButton(text, language) {
   return btn;
 }
 
-// ── Networking ────────────────────────────────────────────────────────────
+// Networking
 async function sendMessage(text) {
   messages.push({ role: "user", content: text });
   loading = true;
@@ -335,7 +322,7 @@ async function sendMessage(text) {
   }
 }
 
-// ── Input handling ────────────────────────────────────────────────────────
+// Input handling
 function handleSend() {
   const text = inputField.value.trim();
   if (!text || loading) return;
@@ -372,7 +359,7 @@ suggestionChips.addEventListener("click", (e) => {
   }
 });
 
-// ── Feedback modal (Microsoft Forms) ─────────────────────────────────────
+// Feedback modal (Microsoft Forms)
 feedbackBtn.addEventListener("click", () => {
   feedbackOverlay.style.display = "flex";
 });
@@ -385,7 +372,7 @@ feedbackOverlay.addEventListener("click", (e) => {
   if (e.target === feedbackOverlay) feedbackOverlay.style.display = "none";
 });
 
-// ── Voice dictation ───────────────────────────────────────────────────────
+// Voice dictation
 const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 const micBtn = document.getElementById("micBtn");
 let recognition  = null;
@@ -548,6 +535,6 @@ function buildServiceCards(services) {
   return section;
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────
+// Init
 updateInputState();
 renderMessages();

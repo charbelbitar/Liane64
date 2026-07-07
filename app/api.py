@@ -92,7 +92,7 @@ def health():
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
     try:
-        # Convert Pydantic messages to plain dicts that main.py expects
+       
         history = [{"role": m.role, "content": m.content} for m in req.history]
 
         answer, parsed, raw_events, raw_services = rag_pipeline(req.message, history)
@@ -154,8 +154,10 @@ def chat(req: ChatRequest):
             services=services,
         )
 
-    except Exception:
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+    # Avoid printing the raw error on the web interface - it still goes to "docker compose logs backend"
+    except Exception as e:
+        print(f"[ERROR] {traceback.format_exc()}") 
+        raise HTTPException(status_code=500, detail="Une erreur est survenue. Veuillez réessayer.")
 
 
 @app.post("/feedback")

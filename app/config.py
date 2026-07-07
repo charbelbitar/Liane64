@@ -4,16 +4,16 @@ from openai import OpenAI
 import chromadb
 
 
-########### Paths
+# Paths
 ILaaS_API_KEY = os.getenv("ILaaS_API_KEY")
 ILaaS_BASE_URL = os.getenv("ILaaS_BASE_URL", "https://llm.ilaas.fr/v1")
 
 
-########### ILaaS LLM
+# ILaaS LLM
 LLM_MODEL = os.getenv("LLM_MODEL")
 
 
-########### ChromaDB
+# ChromaDB
 CHROMA_HOST = os.getenv("CHROMA_HOST", "chroma")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
 CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION", "MPJ_MPEDIA_PAPOTO_CAF_BGE")
@@ -25,7 +25,7 @@ events_collection   = chroma_client.get_or_create_collection(name="events_caf64"
 services_collection = chroma_client.get_or_create_collection(name="servicess")
 
 
-########### Client
+# Client
 client = OpenAI(
     api_key=ILaaS_API_KEY,
     base_url=ILaaS_BASE_URL,
@@ -33,7 +33,6 @@ client = OpenAI(
 )
 
 
-# Refusal helpers (shared across modules)
 REFUSAL_RESPONSES = {
     "Cette question est hors périmètre.",
     "Pas de ressources disponibles.",
