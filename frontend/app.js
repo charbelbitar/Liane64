@@ -113,9 +113,7 @@ function renderMessages() {
         bubble.appendChild(buildServiceCards(msg.services));
       }
 
-      const msgIndex = messages.indexOf(msg);
-      const precedingUserMsg = messages.slice(0, msgIndex).reverse().find(m => m.role === "user");
-            
+      bubble.appendChild(buildBubbleFeedbackBtn());
       if (msg.sources && msg.sources.length > 0) bubble.appendChild(buildSources(msg.sources));
     }
 
@@ -268,6 +266,17 @@ function buildSpeakButton(text, language) {
     window.speechSynthesis.speak(utterance);
   });
 
+  return btn;
+}
+
+function buildBubbleFeedbackBtn() {
+  const btn = document.createElement("button");
+  btn.className = "bubble-feedback-btn";
+  btn.textContent = "💬 Donner mon avis";
+  btn.title = "Donner votre avis sur cette réponse";
+  btn.addEventListener("click", () => {
+    feedbackOverlay.style.display = "flex";
+  });
   return btn;
 }
 
