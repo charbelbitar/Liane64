@@ -105,11 +105,35 @@ _LOCATION_REQUIRED_KEYWORDS = [
 ]
 
 
+_PERSONAL_INDICATORS = [
+    "mon ", "ma ", "notre ", "son ", "sa ",
+    "bébé", "enfant", "fille", "fils", "petit", "petite",
+    "nourrisson", "ado", "adolescent",
+    "il ", "elle ", "le bébé", "la bébé",
+    "je suis enceinte", "ma grossesse", "ma femme", "mon mari",
+]
+
+
+def _extract_age_from_history(query: str, chat_history: list) -> bool:
+    import re
+    age_pattern = re.compile(
+        r'\b(\d+)\s*(?:semaine|sem|mois|month|an(?:s)?|year)',
+        re.IGNORECASE
+    )
+    if age_pattern.search(query): # current query 
+        return True
+    for msg in chat_history: # previous messages in conversation
+        content = msg.get("content", "") if isinstance(msg, dict) else ""
+        if age_pattern.search(content):
+            return True
+    return False
+
+
 def _needs_age_clarification(query: str, chat_history: list) -> bool:
     q = query.lower()
-    age_pattern = re.compile(r'\b(\d+)\s*(?:semaine|mois|an)', re.IGNORECASE)
-    full_text = query + " ".join(m.get("content","") for m in chat_history)
-    if age_pattern.search(full_text):
+    if _extract_age_from_history(query, chat_history):
+        return False
+    if not any(ind in q for ind in _PERSONAL_INDICATORS):
         return False
     return any(kw in q for kw in _AGE_REQUIRED_KEYWORDS)
 
@@ -361,16 +385,19 @@ def _do_rewrite(query: str, history_text: str, last_assistant: str = "") -> str:
         context = f"\nDernière réponse du chatbot :\n{last_assistant}\n"
 
     prompt = (
-        "Reformule la question suivante en une question autonome.\n\n"
-        "Règles :\n"
-        "- Garde le sens exact de la question\n"
-        "- Ajoute le contexte nécessaire depuis l'historique\n"
-        "- Ne fais aucune supposition\n"
-        "- La question doit être compréhensible seule\n"
-        "- Réponds UNIQUEMENT avec la question reformulée\n\n"
-        f"Historique :\n{history_text}\n"
+        "Tu es un assistant qui reformule des questions de suivi en questions autonomes.\n\n"
+        "RÈGLE CRITIQUE : La nouvelle question DOIT inclure TOUT le contexte pertinent "
+        "de l'historique (âge de l'enfant, stade, sujet principal) pour qu'elle soit compréhensible sans l'historique.\n\n"
+        "Exemples :\n"
+        "- Historique: 'mon bébé de 6 mois dort mal' → Suivi: 'il mange bien' "
+        "→ Reformulation: 'un bébé de 6 mois qui dort mal mais mange bien — "
+        "y a-t-il un lien entre alimentation et sommeil à cet âge ?'\n"
+        "- Historique: 'grossesse à 7 mois' → Suivi: 'et pour les douleurs de dos ?' "
+        "→ Reformulation: 'quelles sont les causes et remèdes pour les douleurs de dos au 7ème mois de grossesse ?'\n\n"
+        f"Historique de la conversation :\n{history_text}\n"
         f"{context}\n"
-        f"Question :\n{query}\n\nQuestion reformulée :"
+        f"Question de suivi : {query}\n\n"
+        "Question reformulée (autonome, avec tout le contexte) :"
     )
     try:
         with REWRITE_DURATION.time():
@@ -549,6 +576,10 @@ def llm_grounding_check(answer: str, context_docs: list[str]) -> bool:
         return True
 
 
+def _is_followup(chat_history: list) -> bool:
+    return len([m for m in chat_history if m.get("role") == "assistant"]) > 0
+
+
 # main logic 
 def _append_turn(chat_history: list, query: str, answer: str) -> None:
     chat_history.append({"role": "user",      "content": query})
@@ -583,76 +614,75 @@ def _rag_pipeline_impl(query: str, chat_history):
 
 
     # Clarification gates
-    needs_age = _needs_age_clarification(query, chat_history)
-    needs_loc = _needs_location_clarification(query, chat_history)
+    if not _is_followup(chat_history):
+    # Only ask clarification on FIRST message, never on follow-ups
+        needs_age = _needs_age_clarification(query, chat_history)
+        needs_loc = _needs_location_clarification(query, chat_history)
 
-    if needs_age:
-        clarification = (
-            "Pour vous donner une réponse précise et adaptée, "
-            "pourriez-vous me préciser l'âge de votre enfant "
-            "(en semaines, mois ou années) ?"
-        )
-        print(f"[CLARIFICATION] Age required for query: {query[:60]}")
-        _append_turn(chat_history, query, clarification)
-        return clarification, {
-            "language": "francais", "niveau_langue": "ambigu",
-            "role_detecte": "parent", "phase": "ambigu",
-            "urgence": "non", "reponse": clarification, "sources": []
-        }, [], []
+        if needs_age:
+            clarification = (
+                "Pour vous donner une réponse précise et adaptée, "
+                "pourriez-vous me préciser l'âge de votre enfant "
+                "(en semaines, mois ou années) ?"
+            )
+            print(f"[CLARIFICATION] Age required for query: {query[:60]}")
+            _append_turn(chat_history, query, clarification)
+            return clarification, {
+                "language": "francais", "niveau_langue": "ambigu",
+                "role_detecte": "parent", "phase": "ambigu",
+                "urgence": "non", "reponse": clarification, "sources": []
+            }, [], []
 
-    if needs_loc:
-        clarification = (
-            "Pour vous proposer des événements et services près de chez vous, "
-            "pourriez-vous m'indiquer votre ville ou code postal ?"
-        )
-        print(f"[CLARIFICATION] Location required for query: {query[:60]}")
-        _append_turn(chat_history, query, clarification)
-        return clarification, {
-            "language": "francais", "niveau_langue": "ambigu",
-            "role_detecte": "parent", "phase": "ambigu",
-            "urgence": "non", "reponse": clarification, "sources": []
-        }, [], []
+        if needs_loc:
+            clarification = (
+                "Pour vous proposer des événements et services près de chez vous, "
+                "pourriez-vous m'indiquer votre ville ou code postal ?"
+            )
+            print(f"[CLARIFICATION] Location required for query: {query[:60]}")
+            _append_turn(chat_history, query, clarification)
+            return clarification, {
+                "language": "francais", "niveau_langue": "ambigu",
+                "role_detecte": "parent", "phase": "ambigu",
+                "urgence": "non", "reponse": clarification, "sources": []
+            }, [], []
 
     # Full pipeline
-    with PIPELINE_TOTAL_DURATION.time():
 
-        rewritten_query, query_emb = rewrite_query(query, chat_history)
+    rewritten_query, query_emb = rewrite_query(query, chat_history)
 
-        if rewritten_query == "__NEGATIVE__":
-            reply = "Pas de problème ! N'hésitez pas si vous avez d'autres questions. 😊"
-            _append_turn(chat_history, query, reply)
-            return reply, {}, [], []
+    if rewritten_query == "__NEGATIVE__":
+        reply = "Pas de problème ! N'hésitez pas si vous avez d'autres questions. 😊"
+        _append_turn(chat_history, query, reply)
+        return reply, {}, [], []
 
 
-        query_lang = _detect_query_language(rewritten_query)
-        if query_lang != "fr":
-            if rewritten_query == query and urgency_text != query:
-                retrieval_query = urgency_text
-            else:
-                print(f"[LANG] Non-French query detected (lang={query_lang}) — translating for retrieval/caching")
-                retrieval_query = translate_to_french(rewritten_query)
-            query_emb = None 
+    query_lang = _detect_query_language(rewritten_query)
+    if query_lang != "fr":
+        if rewritten_query == query and urgency_text != query:
+            retrieval_query = urgency_text
         else:
-            retrieval_query = rewritten_query
+            print(f"[LANG] Non-French query detected (lang={query_lang}) — translating for retrieval/caching")
+            retrieval_query = translate_to_french(rewritten_query)
+        query_emb = None 
+    else:
+        retrieval_query = rewritten_query
+    detected_ville, detected_cp = detect_location(retrieval_query)
 
-        detected_ville, detected_cp = detect_location(retrieval_query)
-
-        cached_answer = get_cached_answer(retrieval_query)
-        if cached_answer:
-            try:
-                parsed = json.loads(cached_answer)
-                if not isinstance(parsed, dict) or "reponse" not in parsed:
-                    raise ValueError("Cached entry missing expected structure")
-            except (json.JSONDecodeError, TypeError, ValueError) as e:
-                print(f"[CACHE] Invalid or legacy entry, discarding: {e}")
-                parsed = None
-
-            if parsed:
-                answer = parsed.get("reponse", "")
-                if answer and not is_refusal(answer):
-                    _append_turn(chat_history, query, answer)
-                    return answer, parsed, [], []
-                print("[CACHE] Cached answer was a refusal or empty — retrying")
+    cached_answer = get_cached_answer(retrieval_query)
+    if cached_answer:
+        try:
+            parsed = json.loads(cached_answer)
+            if not isinstance(parsed, dict) or "reponse" not in parsed:
+                raise ValueError("Cached entry missing expected structure")
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            print(f"[CACHE] Invalid or legacy entry, discarding: {e}")
+            parsed = None
+        if parsed:
+            answer = parsed.get("reponse", "")
+            if answer and not is_refusal(answer):
+                _append_turn(chat_history, query, answer)
+                return answer, parsed, [], []
+            print("[CACHE] Cached answer was a refusal or empty — retrying")
 
 
     # Main document retrieval 
@@ -796,7 +826,8 @@ def _rag_pipeline_impl(query: str, chat_history):
         context_parts,
         events=relevant_events if relevant_events else None,
         services=relevant_services if relevant_services else None,
-        location_known=bool(detected_ville or detected_cp)
+        location_known=bool(detected_ville or detected_cp),
+        chat_history=chat_history
     )
 
     system_msg = {
@@ -891,7 +922,7 @@ if __name__ == "__main__":
             break
 
         try:
-            answer, parsed = rag_pipeline(query, chat_history)
+            answer, parsed, _, _  = rag_pipeline(query, chat_history)
             if parsed:
                 print_response(parsed)
             else:

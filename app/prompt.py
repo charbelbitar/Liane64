@@ -1,4 +1,4 @@
-def build_prompt(query: str, documents: list[str], events: list = None, services: list = None, location_known: bool = True):
+def build_prompt(query: str, documents: list[str], events: list = None, services: list = None, location_known: bool = True, chat_history: list = None):
     context = "\n\n".join(documents)
 
     hint = ""
@@ -9,6 +9,20 @@ def build_prompt(query: str, documents: list[str], events: list = None, services
         if services:
             parts.append(f"{len(services)} service(s) pertinent(s) disponible(s)")
         hint = f"\n\n[SYSTÈME: {' et '.join(parts)} — affichés automatiquement par l'interface]"
+
+    history_block = ""
+    if chat_history and len(chat_history) >= 2:
+        recent = chat_history[-4:]  # last 2 exchanges max
+        lines = []
+        for msg in recent:
+            role = "Utilisateur" if msg.get("role") == "user" else "Assistant"
+            content = msg.get("content", "")[:300]  # truncate long answers
+            lines.append(f"{role}: {content}")
+        history_block = (
+            "\n### CONTEXTE DE LA CONVERSATION EN COURS :\n"
+            + "\n".join(lines)
+            + "\n### FIN DU CONTEXTE DE CONVERSATION\n"
+        )
         
     prompt = f"""
 Tu es un assistant spécialisé pour :
@@ -36,7 +50,6 @@ Structure de la réponse (champ "reponse") :
 - Si la réponse complète tient en une ou deux phrases, un simple paragraphe suffit — n'ajoute pas de titres inutiles
 - Dès que la réponse couvre plusieurs points, étapes, ou aspects distincts (causes possibles, ce qu'il faut faire, quand consulter, etc.), structure-la avec des sections claires : un court titre en gras par section (ex. **Ce qu'il faut savoir**, **Que faire**, **Quand consulter**...), avec des listes à puces pour les énumérations
 - Utilise des sauts de ligne (\n) entre les sections pour une bonne lisibilité — n'écris pas un unique bloc de texte dense
-- Les sections "📅 Événements liés" et "🛠️ Services disponibles", quand elles sont présentes, doivent rester des sections séparées et clairement identifiables à la fin de la réponse
 - Longueur : reste concis. Pour une question simple, vise environ 80 à 150 mots. Pour une question qui demande plusieurs sections (ex. causes + conduite à tenir + quand consulter), 250 mots maximum suffisent presque toujours. Ne développe pas au-delà de ce qui répond directement à la question posée — pas de liste exhaustive de cas annexes, pas de répétition de la même idée sous plusieurs formulations
 - Si du contenu mérite d'être développé davantage qu'une réponse concise ne le permet, propose à l'utilisateur de poser une question de suivi plus précise plutôt que de tout détailler d'emblée
  
@@ -72,7 +85,7 @@ Références :
 ### FIN DU CONTEXTE — toute information absente ci-dessus est INTERDITE
  
 Question:
-{query}{hint}
+{history_block}{query}{hint}
  
 FORMAT DE SORTIE OBLIGATOIRE :
 Retourne ta réponse UNIQUEMENT dans ce format JSON valide, sans aucun texte avant ou après, sans bloc markdown (pas de ```json) :
