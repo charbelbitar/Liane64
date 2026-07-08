@@ -14,6 +14,8 @@ from cache import purge_invalid_entries
 from prometheus_fastapi_instrumentator import Instrumentator
 
 
+_CONVERSATION_LOG = pathlib.Path("/app/feedback/conversation_log.jsonl")
+
 purge_invalid_entries()
 
 app = FastAPI(title="RAG Chat API", version="1.0.0")
@@ -29,10 +31,6 @@ app.add_middleware(
 )
 
 Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
-
-FEEDBACK_PATH = pathlib.Path("/app/feedback/feedback.jsonl")
-FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
-
 
 class Message(BaseModel):
     role: str     
@@ -78,13 +76,6 @@ class ChatResponse(BaseModel):
     events: List[EventItem] = []
     services: List[ServiceItem] = []
 
-class FeedbackRequest(BaseModel):
-    rating: Optional[int] = None
-    mcq_answer: Optional[str] = None
-    message_count: Optional[int] = None
-    query: Optional[str] = None
-    answer: Optional[str] = None
-
 
 @app.get("/health")
 def health():
@@ -98,6 +89,22 @@ def chat(req: ChatRequest):
         history = [{"role": m.role, "content": m.content} for m in req.history]
 
         answer, parsed, raw_events, raw_services = rag_pipeline(req.message, history)
+
+        # Log every query/answer regardless of pipeline outcome
+        try:
+            entry = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "query": req.message,
+                "answer": answer,
+                "language": parsed.get("language") if parsed else None,
+                "phase": parsed.get("phase") if parsed else None,
+                "urgence": parsed.get("urgence") if parsed else None,
+            }
+            _CONVERSATION_LOG.parent.mkdir(parents=True, exist_ok=True)
+            with open(_CONVERSATION_LOG, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception as e:
+            print(f"[LOG] Failed to write conversation log: {e}")
 
         sources = parsed.get("sources", []) if parsed else []
 
@@ -160,18 +167,3 @@ def chat(req: ChatRequest):
     except Exception as e:
         print(f"[ERROR] {traceback.format_exc()}") 
         raise HTTPException(status_code=500, detail="Une erreur est survenue. Veuillez réessayer.")
-
-
-@app.post("/feedback")
-def feedback(req: FeedbackRequest):
-    entry = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "rating": req.rating,
-        "mcq_answer": req.mcq_answer,
-        "message_count": req.message_count,
-        "query": req.query,
-        "answer": req.answer,
-    }
-    with open(FEEDBACK_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    return {"status": "ok"}

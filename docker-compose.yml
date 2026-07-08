@@ -16,7 +16,6 @@ services:
       - DATA_DIR=/app/data
     volumes:
       - ./data:/app/data:ro  
-      - ./feedback:/app/feedback 
     depends_on:
       embeddings:
         condition: service_healthy
