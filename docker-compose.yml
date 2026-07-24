@@ -15,7 +15,8 @@ services:
       - CHROMA_COLLECTION=MPJ_MPEDIA_PAPOTO_CAF_BGE
       - DATA_DIR=/app/data
     volumes:
-      - ./data:/app/data:ro  
+      - ./data:/app/data:ro 
+      - ./feedback:/app/feedback
     depends_on:
       embeddings:
         condition: service_healthy
