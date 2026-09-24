@@ -279,7 +279,7 @@ def _llm(messages: list, temperature: float = 0, max_retries: int = 3, max_token
 
         except Exception as e:
             last_exc = e
-            wait = 2 ** attempt  # 2s, 4s, 8s
+            wait = 2 ** attempt 
             print(f"[LLM] Attempt {attempt}/{max_retries} failed: {e} — retrying in {wait}s")
             time.sleep(wait)
 
@@ -613,7 +613,6 @@ def _rag_pipeline_impl(query: str, chat_history):
         return farewell, {}, [], []
 
 
-    # Clarification gates
     if not _is_followup(chat_history):
     # Only ask clarification on FIRST message, never on follow-ups
         needs_age = _needs_age_clarification(query, chat_history)
